@@ -8,6 +8,7 @@ import { createWorld, installContactMaterial, createGround, createWalls, stepWor
 import { createBody } from './physics/bodyFactory';
 import { InstanceManager } from './render/instances';
 import { OBJECT_DEFS, OBJECT_LIST, type ObjectDef } from './objects/defs';
+import { BOARD } from './config';
 import type { RenderContext } from './render/scene';
 
 export interface Entity {
@@ -167,7 +168,28 @@ export class Sandbox {
   update(dt: number): void {
     if (!this.paused) {
       stepWorld(this.world, dt);
+      if (this.wallsEnabled) this.clampToArena();
     }
     this.instances.sync();
+  }
+
+  /**
+   * Backstop: keep every body inside the arena when walls are on. Wall collisions
+   * already handle the normal case; this only catches the rare escapee (a fast
+   * detonate tunnelling/clearing a wall, or pile pressure squeezing one through),
+   * so nothing ever leaks out — without affecting resting objects.
+   */
+  private clampToArena(): void {
+    const lim = BOARD.half - BOARD.wallInset - 0.05;
+    const ceil = BOARD.wallHeight + 4;
+    for (const e of this.entities) {
+      const p = e.body.position;
+      const v = e.body.velocity;
+      if (p.x > lim) { p.x = lim; if (v.x > 0) v.x = 0; }
+      else if (p.x < -lim) { p.x = -lim; if (v.x < 0) v.x = 0; }
+      if (p.z > lim) { p.z = lim; if (v.z > 0) v.z = 0; }
+      else if (p.z < -lim) { p.z = -lim; if (v.z < 0) v.z = 0; }
+      if (p.y > ceil && v.y > 0) { p.y = ceil; v.y = 0; }
+    }
   }
 }
