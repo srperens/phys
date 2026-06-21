@@ -58,8 +58,9 @@ export const BOARD = {
 export const SIM = {
   /** Fixed timestep — physics stays stable regardless of FPS. */
   fixedTimeStep: 1 / 60,
-  /** Max substeps per frame. */
-  maxSubSteps: 3,
+  /** Max catch-up substeps per frame. 2 keeps a heavy scene from spiralling (each
+   *  substep is a full collision solve); under load it runs slightly slow-mo instead. */
+  maxSubSteps: 2,
   /** Clamp on the frame delta so a lag spike does not blow up the simulation. */
   maxDelta: 0.05,
 } as const;

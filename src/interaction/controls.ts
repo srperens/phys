@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { FEEL } from '../config';
+import { FEEL, BOARD } from '../config';
 import type { RenderContext } from '../render/scene';
 import type { Sandbox } from '../sandbox';
 
@@ -121,6 +121,14 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
         jointBody.position.z = planePoint.z;
       }
     }
+
+    // With walls on, keep the drag target inside them so a grabbed object can't be
+    // dragged out through a wall (the grip force would otherwise overpower the wall).
+    if (sandbox.wallsEnabled) {
+      const lim = BOARD.half - BOARD.wallInset - 0.9;
+      jointBody.position.x = Math.max(-lim, Math.min(lim, jointBody.position.x));
+      jointBody.position.z = Math.max(-lim, Math.min(lim, jointBody.position.z));
+    }
   };
 
   const endGrab = () => {
@@ -181,7 +189,10 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
     'wheel',
     (e) => {
       e.preventDefault();
-      radius *= 1 + e.deltaY * 0.001;
+      // Exponential zoom with a clamped delta: responsive for trackpad pinch (many
+      // small deltas) without being wild for a mouse wheel (few large deltas).
+      const dy = Math.max(-25, Math.min(25, e.deltaY));
+      radius *= Math.exp(dy * 0.01);
       updateCamera();
     },
     { passive: false },

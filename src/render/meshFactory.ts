@@ -31,7 +31,7 @@ function makeGeometry(def: ObjectDef): THREE.BufferGeometry {
       return new THREE.BoxGeometry(x * 2, y * 2, z * 2);
     }
     case 'sphere':
-      return new THREE.SphereGeometry(def.shape.radius, 32, 24);
+      return new THREE.SphereGeometry(def.shape.radius, 24, 16);
     case 'cylinder': {
       const { radius, height, segments } = def.shape;
       return new THREE.CylinderGeometry(radius, radius, height, segments);
@@ -45,7 +45,7 @@ function makeGeometry(def: ObjectDef): THREE.BufferGeometry {
     }
     case 'torus':
       // Lies in the XY plane, same as the sphere-ring collider.
-      return new THREE.TorusGeometry(def.shape.radius, def.shape.tube, 16, 40);
+      return new THREE.TorusGeometry(def.shape.radius, def.shape.tube, 14, 28);
     case 'dodeca':
       // Same circumradius as the convex-hull collider (built from a unit dodeca).
       return new THREE.DodecahedronGeometry(def.shape.radius);
