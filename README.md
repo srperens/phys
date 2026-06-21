@@ -29,7 +29,8 @@ pnpm preview  # serve the production build
   tumbles the throw; held still, a shape settles quickly rather than spinning forever.
 - **Drag empty space** — orbit the camera. **Scroll** — zoom.
 - **Spawn buttons** — one per shape (ball, cube, plate, domino, cylinder, prism, torus,
-  dodecahedron). **Press and hold** any spawn button to keep spawning.
+  dodecahedron, and a self-righting gömböc). **Press and hold** any spawn button to keep
+  spawning.
 - **+10 / +25 mixed** — fill the board with random shapes.
 - **Chain** — spawn an interlocking torus chain. The links are threaded deeply through
   each other (their ring colliders interlock) and backed by a link constraint, so they
@@ -38,25 +39,29 @@ pnpm preview  # serve the production build
   huge blast.
 - **Walls** — toggle translucent boundary walls so nothing skids off the board.
 - **Gravity / Bounce** sliders. **Pause**. **Clear** empties the board; **Reset**
-  restores the default gravity/bounce/camera and the starter scene.
+  restores the default gravity/bounce/camera and the starter scene. The panel also shows
+  live object and FPS counters.
 
 ## Architecture
 
-Layers are kept clean and separate — physics never knows about rendering; rendering
-just mirrors the physics. Adding a new shape is a single data entry, not new code in
-three files.
+Physics runs off the main thread in a **Web Worker**; the main thread sends commands and
+renders from a streamed transform buffer. Rendering is **instanced** (one InstancedMesh
+per shape type), so draw calls scale with the number of shape *types*, not objects.
+Adding a new shape is a single data entry, not new code in three files.
 
-| Folder | Responsibility |
+| Folder / file | Responsibility |
 | --- | --- |
-| `physics/` | cannon-es world, body factory, fixed timestep — owns the truth about positions |
-| `render/` | three.js scene, lights, soft shadows, mesh factory — mirrors body → mesh |
-| `objects/` | data-driven object definitions (shape, size, mass, color) |
-| `interaction/` | pointer-pick, grip constraint, camera orbit/zoom |
-| `forces/` | energy release (detonate / implode) |
-| `ui/` | control panel |
+| `physics/physicsWorker.ts` | cannon-es world, body factory, walls, grab constraint, forces — runs entirely in the worker |
+| `physics/physicsClient.ts`, `protocol.ts` | main↔worker messaging; transforms stream back as a transferable `Float32Array` |
+| `physics/world.ts`, `bodyFactory.ts` | pure cannon helpers (shared by the worker) |
+| `render/` | three.js scene, soft shadows, and instanced meshes driven by the worker's transforms (`instances.ts`) |
+| `objects/` | data-driven object definitions + shared collider geometry (prism, dodeca hull, gömböc) |
+| `interaction/` | pointer-pick, grab (streams the drag target to the worker), camera orbit/zoom |
+| `forces/` | energy release (detonate / implode), run in the worker |
+| `ui/` | control panel + counters |
 | `config.ts` | all **feel knobs** in one place — tune here |
-| `sandbox.ts` | binds body ↔ mesh entities and runs spawn/clear |
-| `main.ts` | wires the layers and runs the loop |
+| `sandbox.ts` | orchestrates the physics worker and instanced rendering |
+| `main.ts` | wires the layers; the render loop is draw-only |
 
 ### Feel knobs
 
@@ -67,9 +72,9 @@ shapes, so they lag behind the cursor and *feel* heavy.
 
 ## Stack
 
-Vanilla TypeScript + Vite · [three.js](https://threejs.org) for rendering ·
-[cannon-es](https://github.com/pmndrs/cannon-es) for physics · pnpm ·
-deployed to GitHub Pages via GitHub Actions.
+Vanilla TypeScript + Vite · [three.js](https://threejs.org) for rendering (instanced,
+high-performance WebGL) · [cannon-es](https://github.com/pmndrs/cannon-es) for physics,
+run in a Web Worker · pnpm · deployed to GitHub Pages via GitHub Actions.
 
 ## Notes
 
@@ -77,4 +82,9 @@ deployed to GitHub Pages via GitHub Actions.
   spheres. The open center lets tori thread through each other — that is what makes
   the interlocking chain possible.
 - The triangular prism is a `ConvexPolyhedron` whose mesh and collider share the same
-  vertices.
+  vertices; the dodecahedron's collider is a convex hull of the same vertices as its mesh.
+- A true gömböc can't be reproduced in a rigid-body engine, so the gömböc is an honest
+  approximation: an offset-sphere collider gives a low centre of mass (Weeble-style) so it
+  always self-rights, under a sculpted asymmetric mesh.
+- Walls are contained by a per-frame arena clamp (a backstop), so nothing escapes even a
+  full-charge detonate; the thin wall colliders just provide the bounce.
