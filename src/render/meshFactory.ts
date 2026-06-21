@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { ObjectDef } from '../objects/defs';
 import { prismPositions } from '../objects/prism';
+import { checkerTexture } from './textures';
 
 export function createMesh(def: ObjectDef): THREE.Mesh {
   const geometry = makeGeometry(def);
@@ -12,6 +13,8 @@ export function createMesh(def: ObjectDef): THREE.Mesh {
     color: def.color,
     roughness: 0.7,
     metalness: 0.05,
+    // Square grid texture multiplies the color → keeps the hue, adds squares.
+    map: checkerTexture(),
     flatShading: def.shape.kind === 'prism',
   });
   const mesh = new THREE.Mesh(geometry, material);

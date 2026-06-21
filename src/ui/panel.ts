@@ -68,18 +68,18 @@ export function createPanel(sandbox: Sandbox): void {
   body.style.cssText = 'display:flex; flex-direction:column; gap:12px;';
   panel.appendChild(body);
 
-  // Per-type spawn buttons.
+  // Per-type spawn buttons. Press and hold to keep spawning.
   const spawnRow = el('div', 'phys-row');
   for (const def of OBJECT_LIST) {
-    spawnRow.appendChild(button(def.label, () => sandbox.spawn(def.id)));
+    spawnRow.appendChild(repeatButton(def.label, () => sandbox.spawn(def.id)));
   }
   body.appendChild(spawnRow);
 
-  // Bulk spawn + chain.
+  // Bulk spawn + chain. Also hold-to-repeat.
   const bulkRow = el('div', 'phys-row-3');
-  bulkRow.appendChild(button('+10 mixed', () => sandbox.spawnMany(10)));
-  bulkRow.appendChild(button('+25 mixed', () => sandbox.spawnMany(25)));
-  bulkRow.appendChild(button('Chain', () => sandbox.spawnChain()));
+  bulkRow.appendChild(repeatButton('+10 mixed', () => sandbox.spawnMany(10)));
+  bulkRow.appendChild(repeatButton('+25 mixed', () => sandbox.spawnMany(25)));
+  bulkRow.appendChild(repeatButton('Chain', () => sandbox.spawnChain()));
   body.appendChild(bulkRow);
 
   body.appendChild(divider());
@@ -152,6 +152,34 @@ function button(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
   b.textContent = label;
   b.onclick = onClick;
+  return b;
+}
+
+/**
+ * Button that fires once on press, then keeps firing while held (press-and-spam).
+ * Pointer capture keeps it repeating even if the finger drifts off the button.
+ */
+function repeatButton(label: string, action: () => void, interval = 110): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.textContent = label;
+  let timer = 0;
+
+  const stop = () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = 0;
+    }
+  };
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    action();
+    stop();
+    timer = window.setInterval(action, interval);
+    b.setPointerCapture(e.pointerId);
+  });
+  b.addEventListener('pointerup', stop);
+  b.addEventListener('pointercancel', stop);
+  window.addEventListener('blur', stop);
   return b;
 }
 

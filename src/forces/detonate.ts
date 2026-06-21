@@ -12,7 +12,7 @@ export interface BlastOptions {
   spin: number;
 }
 
-const DEFAULTS: BlastOptions = { strength: 26, upwardBias: 0.55, spin: 14 };
+const DEFAULTS: BlastOptions = { strength: 90, upwardBias: 0.55, spin: 26 };
 
 /**
  * Push every dynamic body away from `center`.

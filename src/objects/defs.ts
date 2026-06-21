@@ -68,7 +68,8 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
     id: 'torus',
     label: 'Torus',
     // Cannon has no native torus → the collider is built as a ring of small spheres.
-    shape: { kind: 'torus', radius: 0.55, tube: 0.2, segments: 14 },
+    // Thin tube keeps the links slim with plenty of room in the hole → a looser chain.
+    shape: { kind: 'torus', radius: 0.55, tube: 0.12, segments: 16 },
     mass: 3,
     color: PALETTE.warmWhite,
   },

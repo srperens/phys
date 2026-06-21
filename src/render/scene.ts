@@ -17,7 +17,7 @@ export function createRenderer(canvas: HTMLCanvasElement): RenderContext {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.25;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.background);
@@ -44,10 +44,10 @@ export function createRenderer(canvas: HTMLCanvasElement): RenderContext {
 }
 
 function setupLights(scene: THREE.Scene): void {
-  const ambient = new THREE.HemisphereLight(0xb9c7d6, 0x202428, 0.55);
+  const ambient = new THREE.HemisphereLight(0xc7d4e1, 0x3a4048, 0.9);
   scene.add(ambient);
 
-  const key = new THREE.DirectionalLight(0xfff2e0, 1.1);
+  const key = new THREE.DirectionalLight(0xfff2e0, 1.35);
   key.position.set(6, 12, 8);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
@@ -61,7 +61,7 @@ function setupLights(scene: THREE.Scene): void {
   key.shadow.bias = -0.0004;
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight(0x6f86c9, 0.35);
+  const fill = new THREE.DirectionalLight(0x8fa0d4, 0.5);
   fill.position.set(-8, 5, -6);
   scene.add(fill);
 }

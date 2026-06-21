@@ -5,8 +5,8 @@
  */
 
 export const FEEL = {
-  /** Normal Earth gravity. (The panel slider can pull harder for a "firmer" feel.) */
-  gravity: -9.82,
+  /** A notch harder than Earth's 9.82 → firmer, more "weighty" feel (vision sweet spot). */
+  gravity: -20,
 
   /** Rigid objects — almost no bounce. */
   restitution: 0.1,
@@ -42,9 +42,9 @@ export const SIM = {
 
 /** Matte, harmonious palette — matte > glossy, keeps the scene "clean". */
 export const PALETTE = {
-  background: 0x0c0e11,
-  board: 0x1a1f25,
-  grid: 0x2b333c,
+  background: 0x171b21,
+  board: 0x424b56,
+  grid: 0x5b6671,
   warmWhite: 0xf2ece1,
   teal: 0x4fb6a8,
   coral: 0xe07a5f,
