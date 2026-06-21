@@ -5,6 +5,7 @@ import * as CANNON from 'cannon-es';
 import type { ObjectDef } from '../objects/defs';
 import { PRISM_VERTS, PRISM_FACES } from '../objects/prism';
 import { DODECA_VERTS, DODECA_FACES } from '../objects/dodeca';
+import { GOMBOC } from '../objects/gomboc';
 import { FEEL } from '../config';
 
 export function createBody(def: ObjectDef): CANNON.Body {
@@ -19,6 +20,13 @@ export function createBody(def: ObjectDef): CANNON.Body {
   body.sleepTimeLimit = FEEL.sleepTimeLimit;
   if (def.shape.kind === 'torus') {
     addTorusShapes(body, def.shape.radius, def.shape.tube, def.shape.segments);
+  } else if (def.shape.kind === 'gomboc') {
+    // Sphere offset above the origin → COM sits low → self-rights.
+    body.addShape(new CANNON.Sphere(GOMBOC.sphereRadius), new CANNON.Vec3(0, GOMBOC.sphereCenterY, 0));
+    // Never sleep: otherwise it can freeze mid-righting or balanced on its unstable top.
+    body.allowSleep = false;
+    // Extra angular damping so it rights crisply instead of wobbling for ages.
+    body.angularDamping = 0.55;
   } else {
     body.addShape(makeShape(def));
   }
@@ -51,8 +59,9 @@ function makeShape(def: ObjectDef): CANNON.Shape {
       });
     }
     case 'torus':
-      // Handled by createBody as a compound (multiple shapes). Never reached.
-      throw new Error('torus is built in createBody');
+    case 'gomboc':
+      // Handled directly in createBody (offset/compound shapes). Never reached.
+      throw new Error(`${def.shape.kind} is built in createBody`);
   }
 }
 

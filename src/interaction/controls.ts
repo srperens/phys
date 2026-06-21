@@ -48,6 +48,7 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
   let lastX = 0;
   let lastY = 0;
   let grabbed: CANNON.Body | null = null;
+  let grabbedAllowSleep = true;
   let jointBody: CANNON.Body | null = null;
   let constraint: CANNON.PointToPointConstraint | null = null;
   const plane = new THREE.Plane();
@@ -64,6 +65,7 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
 
   const beginGrab = (body: CANNON.Body, hitPoint: THREE.Vector3) => {
     grabbed = body;
+    grabbedAllowSleep = body.allowSleep;
     body.allowSleep = false;
     body.wakeUp();
     // Calm the held object so it hangs steady instead of spinning on its own.
@@ -125,7 +127,7 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
     if (constraint) sandbox.world.removeConstraint(constraint);
     if (jointBody) sandbox.world.removeBody(jointBody);
     if (grabbed) {
-      grabbed.allowSleep = FEEL.allowSleep;
+      grabbed.allowSleep = grabbedAllowSleep;
       grabbed.angularDamping = FEEL.angularDamping;
       grabbed.linearDamping = FEEL.linearDamping;
     }

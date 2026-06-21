@@ -11,7 +11,8 @@ export type ShapeDef =
   | { kind: 'cylinder'; radius: number; height: number; segments: number }
   | { kind: 'prism' } // triangular prism, geometry in prism.ts
   | { kind: 'torus'; radius: number; tube: number; segments: number } // collider = ring of spheres
-  | { kind: 'dodeca'; radius: number }; // collider = convex hull, see dodeca.ts
+  | { kind: 'dodeca'; radius: number } // collider = convex hull, see dodeca.ts
+  | { kind: 'gomboc' }; // self-righting teardrop, see gomboc.ts
 
 export interface ObjectDef {
   id: string;
@@ -81,6 +82,13 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
     shape: { kind: 'dodeca', radius: 0.8 },
     mass: 6,
     color: PALETTE.indigo,
+  },
+  gomboc: {
+    id: 'gomboc',
+    label: 'Gömböc',
+    shape: { kind: 'gomboc' },
+    mass: 3,
+    color: PALETTE.amber,
   },
 };
 
