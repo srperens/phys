@@ -6,7 +6,7 @@
 import { DODECA_VERTS, DODECA_FACES } from '../objects/dodeca';
 import type { MainToWorker, WorkerToMain } from './protocol';
 
-export type FrameHandler = (count: number, transforms: Float32Array) => void;
+export type FrameHandler = (gen: number, count: number, transforms: Float32Array) => void;
 
 export class PhysicsClient {
   private readonly worker: Worker;
@@ -14,7 +14,7 @@ export class PhysicsClient {
   constructor(onFrame: FrameHandler) {
     this.worker = new Worker(new URL('./physicsWorker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<WorkerToMain>) => {
-      if (e.data.type === 'frame') onFrame(e.data.count, new Float32Array(e.data.buffer));
+      if (e.data.type === 'frame') onFrame(e.data.gen, e.data.count, new Float32Array(e.data.buffer));
     };
     // dodeca hull is computed on the main thread (three) and handed to the worker.
     this.post({ type: 'init', dodecaVerts: DODECA_VERTS, dodecaFaces: DODECA_FACES });
@@ -24,11 +24,11 @@ export class PhysicsClient {
     this.worker.postMessage(m);
   }
 
-  spawn(id: string, pos: [number, number, number], quat: [number, number, number, number]): void {
-    this.post({ type: 'spawn', id, pos, quat });
+  spawn(gen: number, id: string, pos: [number, number, number], quat: [number, number, number, number]): void {
+    this.post({ type: 'spawn', gen, id, pos, quat });
   }
-  spawnChain(): void { this.post({ type: 'spawnChain' }); }
-  clear(): void { this.post({ type: 'clear' }); }
+  spawnChain(gen: number): void { this.post({ type: 'spawnChain', gen }); }
+  clear(gen: number): void { this.post({ type: 'clear', gen }); }
   pause(paused: boolean): void { this.post({ type: 'pause', paused }); }
   gravity(value: number): void { this.post({ type: 'gravity', value }); }
   restitution(value: number): void { this.post({ type: 'restitution', value }); }

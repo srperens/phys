@@ -65,7 +65,10 @@ export class InstanceManager {
 
   private grow(g: TypeGroup): void {
     const bigger = this.makeMesh(g.def, g.mesh.instanceMatrix.count * 2);
-    bigger.count = g.count;
+    // Preserve the currently-drawn instances so nothing flickers across the grow.
+    bigger.count = g.mesh.count;
+    bigger.instanceMatrix.array.set(g.mesh.instanceMatrix.array.subarray(0, g.mesh.count * 16));
+    bigger.instanceMatrix.needsUpdate = true;
     bigger.userData.group = g;
     this.scene.remove(g.mesh);
     g.mesh.dispose();
@@ -73,14 +76,15 @@ export class InstanceManager {
     g.mesh = bigger;
   }
 
-  /** Register a new body (flat index = current order length). */
+  /** Register a new body (flat index = current order length). Does NOT bump the drawn
+   *  mesh.count — that happens only when a matching frame writes the instance's matrix,
+   *  so we never draw a slot whose transform hasn't arrived yet. */
   add(def: ObjectDef): void {
     const g = this.group(def);
     if (g.count >= g.mesh.instanceMatrix.count) this.grow(g);
     const slot = g.count;
     g.flatIndices[slot] = this.order.length;
     g.count += 1;
-    g.mesh.count = g.count;
     this.order.push({ group: g, slot });
   }
 
@@ -99,7 +103,11 @@ export class InstanceManager {
     return g?.flatIndices[instanceId];
   }
 
-  /** Write the worker's transform frame into the instance matrices. */
+  /**
+   * Write the worker's transform frame into the instance matrices. Only called for a
+   * generation-matched frame, so count === order.length and every current instance is
+   * written — then reveal each group by setting its drawn count to the written total.
+   */
   applyFrame(count: number, t: Float32Array): void {
     const n = Math.min(count, this.order.length);
     const touched = new Set<TypeGroup>();
@@ -112,6 +120,9 @@ export class InstanceManager {
       group.mesh.setMatrixAt(slot, this.m);
       touched.add(group);
     }
-    for (const g of touched) g.mesh.instanceMatrix.needsUpdate = true;
+    for (const g of touched) {
+      g.mesh.count = g.count;
+      g.mesh.instanceMatrix.needsUpdate = true;
+    }
   }
 }

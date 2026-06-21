@@ -23,13 +23,20 @@ export class Sandbox {
   paused = false;
   wallsEnabled = false;
 
+  /** Structural generation, bumped on every spawn/clear. The worker echoes it in each
+   *  frame; we only apply frames whose gen matches, so a late frame never gets mapped
+   *  onto a different object set (which caused objects to blip to wrong positions). */
+  private gen = 0;
+
   /** Deterministic pseudo-random → nicely spread spawns, reproducible. */
   private seed = 1;
 
   constructor(render: RenderContext) {
     this.render = render;
     this.instances = new InstanceManager(render.scene);
-    this.physics = new PhysicsClient((count, t) => this.instances.applyFrame(count, t));
+    this.physics = new PhysicsClient((frameGen, count, t) => {
+      if (frameGen === this.gen) this.instances.applyFrame(count, t);
+    });
   }
 
   get count(): number {
@@ -65,7 +72,8 @@ export class Sandbox {
       6 + this.rand() * 4,
       (this.rand() - 0.5) * 5,
     ];
-    this.physics.spawn(defId, pos, this.randomQuat());
+    this.gen += 1;
+    this.physics.spawn(this.gen, defId, pos, this.randomQuat());
     this.instances.add(def);
     this._count += 1;
   }
@@ -79,7 +87,8 @@ export class Sandbox {
 
   /** Worker builds the linked chain; main just registers the 7 torus instances. */
   spawnChain(): void {
-    this.physics.spawnChain();
+    this.gen += 1;
+    this.physics.spawnChain(this.gen);
     for (let i = 0; i < 7; i++) {
       this.instances.add(OBJECT_DEFS.torus);
       this._count += 1;
@@ -92,7 +101,8 @@ export class Sandbox {
   }
 
   clear(): void {
-    this.physics.clear();
+    this.gen += 1;
+    this.physics.clear(this.gen);
     this.instances.clear();
     this._count = 0;
   }

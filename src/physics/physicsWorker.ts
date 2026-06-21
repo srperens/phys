@@ -26,6 +26,7 @@ const constraints: CANNON.Constraint[] = [];
 const walls: CANNON.Body[] = [];
 let wallsOn = false;
 let paused = false;
+let gen = 0; // structural generation, echoed in frames so main applies only matching ones
 // Dodecahedron hull (from the main thread's three-based computation).
 let dodecaVerts: number[][] = [];
 let dodecaFaces: number[][] = [];
@@ -216,6 +217,7 @@ function handle(msg: MainToWorker): void {
       walls.push(...createWalls());
       break;
     case 'spawn': {
+      gen = msg.gen;
       const def = OBJECT_DEFS[msg.id];
       if (def) {
         const q = new CANNON.Quaternion(msg.quat[0], msg.quat[1], msg.quat[2], msg.quat[3]);
@@ -223,8 +225,8 @@ function handle(msg: MainToWorker): void {
       }
       break;
     }
-    case 'spawnChain': spawnChain(); break;
-    case 'clear': clearAll(); break;
+    case 'spawnChain': gen = msg.gen; spawnChain(); break;
+    case 'clear': gen = msg.gen; clearAll(); break;
     case 'pause': paused = msg.paused; break;
     case 'gravity': world.gravity.set(0, msg.value, 0); wakeAll(); break;
     case 'restitution': world.defaultContactMaterial.restitution = msg.value; wakeAll(); break;
@@ -262,7 +264,7 @@ function tick(): void {
       f[o + 3] = b.quaternion.x; f[o + 4] = b.quaternion.y;
       f[o + 5] = b.quaternion.z; f[o + 6] = b.quaternion.w;
     }
-    self.postMessage({ type: 'frame', count: bodies.length, buffer: f.buffer }, { transfer: [f.buffer] });
+    self.postMessage({ type: 'frame', gen, count: bodies.length, buffer: f.buffer }, { transfer: [f.buffer] });
   }
   setTimeout(tick, 1000 / 60);
 }
