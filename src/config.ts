@@ -24,11 +24,26 @@ export const FEEL = {
    */
   gripMaxForce: 500,
 
-  /** Solver iterations. High (~14) is needed for stable chain constraints later. */
-  solverIterations: 14,
+  /** Solver iterations. High count keeps stacks stable and stops chain links from
+   *  being forced through each other when pulled hard. */
+  solverIterations: 30,
+
+  /** Contact stiffness/relaxation — a bit stiffer than cannon's 1e7 default so rigid
+   *  rings resist being squeezed through one another, but low enough to stay stable
+   *  at a 1/60 timestep (too high → the solver explodes). */
+  contactStiffness: 2e7,
+  contactRelaxation: 3,
 
   /** Resting shapes fall asleep (looks good + saves CPU). Wake on grip/detonate. */
   allowSleep: true,
+} as const;
+
+/** The board (and grid). Walls sit just inside this. Single source of truth. */
+export const BOARD = {
+  size: 18,
+  half: 9,
+  /** Walls sit this far inside the edge. */
+  wallInset: 0.5,
 } as const;
 
 export const SIM = {

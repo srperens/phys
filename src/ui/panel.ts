@@ -23,9 +23,15 @@ const CSS = `
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 14px;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .phys-panel h1 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #9aa7b3; margin: 0; }
+  text-transform: uppercase; color: #9aa7b3; margin: 0;
+  display: flex; justify-content: space-between; align-items: center; }
+.phys-chevron { display: none; transition: transform 0.15s ease; color: #9aa7b3; }
+.phys-body { display: flex; flex-direction: column; gap: 12px; }
 .phys-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .phys-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .phys-panel button {
@@ -48,11 +54,15 @@ const CSS = `
 .phys-stat b { color: #e7ecf1; font-weight: 600; }
 .phys-field label { display: block; color: #9aa7b3; margin-bottom: 4px; }
 .phys-field input[type=range] { width: 100%; accent-color: #4fb6a8; }
-.phys-collapse { display: none; }
 @media (max-width: 640px) {
-  .phys-panel { width: 168px; }
-  .phys-collapse { display: block; }
+  .phys-panel { width: 144px; top: 10px; left: 10px; padding: 10px; gap: 8px;
+    font-size: 12px; border-radius: 12px; }
+  .phys-panel button { padding: 7px 4px; border-radius: 8px; }
+  .phys-panel h1 { cursor: pointer; }
+  .phys-chevron { display: inline; }
+  .phys-panel.collapsed { gap: 0; }
   .phys-panel.collapsed .phys-body { display: none; }
+  .phys-panel.collapsed .phys-chevron { transform: rotate(-90deg); }
 }
 `;
 
@@ -63,16 +73,25 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
 
   const panel = el('div', 'phys-panel');
 
+  // Header doubles as the collapse toggle on small screens.
   const header = el('h1');
-  header.textContent = 'phys';
+  const title = document.createElement('span');
+  title.textContent = 'phys';
+  const chevron = document.createElement('span');
+  chevron.className = 'phys-chevron';
+  chevron.textContent = '▾';
+  header.appendChild(title);
+  header.appendChild(chevron);
+  const isSmall = () => window.matchMedia('(max-width: 640px)').matches;
+  header.addEventListener('click', () => {
+    if (isSmall()) panel.classList.toggle('collapsed');
+  });
   panel.appendChild(header);
 
-  const collapseBtn = button('Show / hide', () => panel.classList.toggle('collapsed'));
-  collapseBtn.className = 'phys-collapse';
-  panel.appendChild(collapseBtn);
+  // Start minimized on phones so it doesn't cover the scene.
+  if (isSmall()) panel.classList.add('collapsed');
 
   const body = el('div', 'phys-body');
-  body.style.cssText = 'display:flex; flex-direction:column; gap:12px;';
   panel.appendChild(body);
 
   // Per-type spawn buttons. Press and hold to keep spawning.

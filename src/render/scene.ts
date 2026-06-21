@@ -2,7 +2,7 @@
  * Render layer. Only mirrors the physics. Dark, clean scene with soft shadows.
  */
 import * as THREE from 'three';
-import { PALETTE } from '../config';
+import { PALETTE, BOARD } from '../config';
 
 export interface RenderContext {
   renderer: THREE.WebGLRenderer;
@@ -67,7 +67,7 @@ function setupLights(scene: THREE.Scene): void {
 }
 
 function setupBoard(scene: THREE.Scene): void {
-  const size = 24;
+  const size = BOARD.size;
 
   const board = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),

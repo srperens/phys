@@ -2,7 +2,7 @@
  * Physics layer. Owns the truth about positions. Knows NOTHING about rendering.
  */
 import * as CANNON from 'cannon-es';
-import { FEEL, SIM } from '../config';
+import { FEEL, SIM, BOARD } from '../config';
 
 export function createWorld(): CANNON.World {
   const world = new CANNON.World({
@@ -28,12 +28,16 @@ export function installContactMaterial(world: CANNON.World): void {
     {
       restitution: FEEL.restitution,
       friction: FEEL.friction,
+      contactEquationStiffness: FEEL.contactStiffness,
+      contactEquationRelaxation: FEEL.contactRelaxation,
     },
   );
   world.addContactMaterial(contact);
   // Make sure the default contact mirrors our knobs too.
   world.defaultContactMaterial.restitution = FEEL.restitution;
   world.defaultContactMaterial.friction = FEEL.friction;
+  world.defaultContactMaterial.contactEquationStiffness = FEEL.contactStiffness;
+  world.defaultContactMaterial.contactEquationRelaxation = FEEL.contactRelaxation;
 }
 
 /** Static floor (the board). Plane faces up in +Y. */
@@ -52,7 +56,7 @@ export function createGround(world: CANNON.World): CANNON.Body {
  * skid or bounce off the edge. Returned but NOT added to the world — the sandbox
  * toggles them on/off. `boundary` is just inside the visible board (half-size 12).
  */
-export function createWalls(boundary = 11.5): CANNON.Body[] {
+export function createWalls(boundary = BOARD.half - BOARD.wallInset): CANNON.Body[] {
   const localNormal = new CANNON.Vec3(0, 0, 1); // CANNON.Plane faces +Z
   const specs: Array<{ pos: CANNON.Vec3; normal: CANNON.Vec3 }> = [
     { pos: new CANNON.Vec3(boundary, 0, 0), normal: new CANNON.Vec3(-1, 0, 0) },
