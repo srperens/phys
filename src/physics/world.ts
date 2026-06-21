@@ -59,17 +59,16 @@ export function createGround(world: CANNON.World): CANNON.Body {
  */
 export function createWalls(boundary = BOARD.half - BOARD.wallInset): CANNON.Body[] {
   const h = BOARD.wallHeight / 2;
-  // Thick walls (no CCD in cannon) so fast objects can't tunnel through in one step.
-  // The box extends OUTWARD from the boundary; its inner face stays at `boundary`,
-  // aligned with the thin visible panel. `len` overlaps the corners.
-  const t = 1.5; // half thickness
+  // Thin walls centred on the boundary, aligned with the visible panel (no outward
+  // ledge). These give the bounce; the sandbox's arena clamp is what guarantees
+  // nothing escapes (so the walls don't need to be thick for anti-tunnelling).
+  const t = 0.15; // half thickness
   const len = boundary + t;
-  const inner = boundary + t; // centre offset so the inner face sits at `boundary`
   const specs: Array<{ pos: CANNON.Vec3; half: CANNON.Vec3 }> = [
-    { pos: new CANNON.Vec3(inner, h, 0), half: new CANNON.Vec3(t, h, len) },
-    { pos: new CANNON.Vec3(-inner, h, 0), half: new CANNON.Vec3(t, h, len) },
-    { pos: new CANNON.Vec3(0, h, inner), half: new CANNON.Vec3(len, h, t) },
-    { pos: new CANNON.Vec3(0, h, -inner), half: new CANNON.Vec3(len, h, t) },
+    { pos: new CANNON.Vec3(boundary, h, 0), half: new CANNON.Vec3(t, h, len) },
+    { pos: new CANNON.Vec3(-boundary, h, 0), half: new CANNON.Vec3(t, h, len) },
+    { pos: new CANNON.Vec3(0, h, boundary), half: new CANNON.Vec3(len, h, t) },
+    { pos: new CANNON.Vec3(0, h, -boundary), half: new CANNON.Vec3(len, h, t) },
   ];
   return specs.map(({ pos, half }) => {
     const body = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Box(half) });
