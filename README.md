@@ -31,9 +31,9 @@ pnpm preview  # serve the production build
 - **Spawn buttons** — one per shape (ball, cube, plate, domino, cylinder, prism, torus).
   **Press and hold** any spawn button to keep spawning.
 - **+10 / +25 mixed** — fill the board with random shapes.
-- **Chain** — spawn an interlocking torus chain. The links interlock via their threaded
-  ring colliders and are backed by a link constraint at their natural resting distance,
-  so the chain hangs naturally but can't be pulled apart.
+- **Chain** — spawn an interlocking torus chain. The links are threaded deeply through
+  each other (their ring colliders interlock) and backed by a link constraint, so they
+  stay genuinely interlocked and can't be pulled apart.
 - **Detonate / Implode** — **hold to charge**: a tap is a light pop, a full hold is a
   huge blast.
 - **Walls** — toggle invisible boundary walls so nothing skids off the board.

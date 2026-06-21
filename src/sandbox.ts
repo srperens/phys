@@ -100,18 +100,18 @@ export class Sandbox {
   }
 
   /**
-   * Torus chain (M5): N tori threaded through each other (alternating hole axis so
-   * they interlock), PLUS a DistanceConstraint between neighbours at the distance
-   * they naturally rest at. The interlocking colliders give the real ring-on-ring
-   * contact; the constraint is the unbreakable backbone so a hard pull can't squeeze
-   * one link's tube through another. The distance matches the natural rest gap, so
-   * visually it hangs like a real chain (no clumping) — it just won't come apart.
+   * Torus chain (M5): N tori threaded deeply through each other (alternating hole
+   * axis), PLUS a DistanceConstraint between neighbours held at the ring radius.
+   *
+   * The small spacing (= ring radius) keeps them DEEPLY threaded: to come side-by-side
+   * the rings would have to heavily overlap, which collision strongly resists — so they
+   * stay genuinely interlocked, not beads-on-a-string. The constraint is the unbreakable
+   * backbone so a hard pull can't squeeze one link's tube out through another.
    */
   spawnChain(links = 7): void {
     const def = OBJECT_DEFS.torus;
     if (def.shape.kind !== 'torus') return;
-    // ~1.35× the ring radius: links stay threaded, and it's where collision rests them.
-    const spacing = def.shape.radius * 1.35;
+    const spacing = def.shape.radius; // deep threading → clearly interlocked
     const startX = -(links - 1) * spacing * 0.5;
     let prev: CANNON.Body | undefined;
 
