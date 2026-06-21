@@ -14,7 +14,8 @@ export interface RenderContext {
 }
 
 export function createRenderer(canvas: HTMLCanvasElement): RenderContext {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Prefer the discrete GPU on dual-GPU laptops.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
