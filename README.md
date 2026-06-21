@@ -28,15 +28,15 @@ pnpm preview  # serve the production build
   dragging to set its height instead. Off-center grabs apply torque, so a quick flick
   tumbles the throw; held still, a shape settles quickly rather than spinning forever.
 - **Drag empty space** — orbit the camera. **Scroll** — zoom.
-- **Spawn buttons** — one per shape (ball, cube, plate, domino, cylinder, prism, torus).
-  **Press and hold** any spawn button to keep spawning.
+- **Spawn buttons** — one per shape (ball, cube, plate, domino, cylinder, prism, torus,
+  dodecahedron). **Press and hold** any spawn button to keep spawning.
 - **+10 / +25 mixed** — fill the board with random shapes.
 - **Chain** — spawn an interlocking torus chain. The links are threaded deeply through
   each other (their ring colliders interlock) and backed by a link constraint, so they
   stay genuinely interlocked and can't be pulled apart.
 - **Detonate / Implode** — **hold to charge**: a tap is a light pop, a full hold is a
   huge blast.
-- **Walls** — toggle invisible boundary walls so nothing skids off the board.
+- **Walls** — toggle translucent boundary walls so nothing skids off the board.
 - **Gravity / Bounce** sliders. **Pause**. **Clear** empties the board; **Reset**
   restores the default gravity/bounce/camera and the starter scene.
 

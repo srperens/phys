@@ -138,6 +138,7 @@ export class Sandbox {
       if (on) this.world.addBody(w);
       else this.world.removeBody(w);
     }
+    this.render.wallGroup.visible = on; // show/hide the translucent panels
     this.wakeAll();
   }
 

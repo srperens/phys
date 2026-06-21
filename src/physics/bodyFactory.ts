@@ -4,6 +4,7 @@
 import * as CANNON from 'cannon-es';
 import type { ObjectDef } from '../objects/defs';
 import { PRISM_VERTS, PRISM_FACES } from '../objects/prism';
+import { DODECA_VERTS, DODECA_FACES } from '../objects/dodeca';
 import { FEEL } from '../config';
 
 export function createBody(def: ObjectDef): CANNON.Body {
@@ -42,6 +43,13 @@ function makeShape(def: ObjectDef): CANNON.Shape {
         vertices: PRISM_VERTS.map(([x, y, z]) => new CANNON.Vec3(x, y, z)),
         faces: PRISM_FACES,
       });
+    case 'dodeca': {
+      const r = def.shape.radius;
+      return new CANNON.ConvexPolyhedron({
+        vertices: DODECA_VERTS.map(([x, y, z]) => new CANNON.Vec3(x * r, y * r, z * r)),
+        faces: DODECA_FACES,
+      });
+    }
     case 'torus':
       // Handled by createBody as a compound (multiple shapes). Never reached.
       throw new Error('torus is built in createBody');

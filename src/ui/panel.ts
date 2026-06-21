@@ -172,17 +172,32 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   );
   body.appendChild(actionRow);
 
-  // Counter.
+  // Counters.
   const stat = el('div', 'phys-stat');
   stat.innerHTML = `<span>Objects</span><b>0</b>`;
   const statValue = stat.querySelector('b')!;
   body.appendChild(stat);
 
+  const fpsStat = el('div', 'phys-stat');
+  fpsStat.innerHTML = `<span>FPS</span><b>—</b>`;
+  const fpsValue = fpsStat.querySelector('b')!;
+  body.appendChild(fpsStat);
+
   document.body.appendChild(panel);
 
-  // Keep the counter updated.
+  // Keep counters updated; FPS averaged over a short window so it doesn't flicker.
+  let windowStart = performance.now();
+  let frames = 0;
   const tick = () => {
     statValue.textContent = String(sandbox.count);
+    frames++;
+    const now = performance.now();
+    const elapsed = now - windowStart;
+    if (elapsed >= 500) {
+      fpsValue.textContent = String(Math.round((frames * 1000) / elapsed));
+      frames = 0;
+      windowStart = now;
+    }
     requestAnimationFrame(tick);
   };
   tick();

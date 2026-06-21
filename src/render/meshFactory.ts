@@ -15,7 +15,7 @@ export function createMesh(def: ObjectDef): THREE.Mesh {
     metalness: 0.05,
     // Square grid texture multiplies the color → keeps the hue, adds squares.
     map: checkerTexture(),
-    flatShading: def.shape.kind === 'prism',
+    flatShading: def.shape.kind === 'prism' || def.shape.kind === 'dodeca',
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.castShadow = true;
@@ -45,5 +45,8 @@ function makeGeometry(def: ObjectDef): THREE.BufferGeometry {
     case 'torus':
       // Lies in the XY plane, same as the sphere-ring collider.
       return new THREE.TorusGeometry(def.shape.radius, def.shape.tube, 16, 40);
+    case 'dodeca':
+      // Same circumradius as the convex-hull collider (built from a unit dodeca).
+      return new THREE.DodecahedronGeometry(def.shape.radius);
   }
 }

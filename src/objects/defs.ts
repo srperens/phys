@@ -10,7 +10,8 @@ export type ShapeDef =
   | { kind: 'sphere'; radius: number }
   | { kind: 'cylinder'; radius: number; height: number; segments: number }
   | { kind: 'prism' } // triangular prism, geometry in prism.ts
-  | { kind: 'torus'; radius: number; tube: number; segments: number }; // collider = ring of spheres
+  | { kind: 'torus'; radius: number; tube: number; segments: number } // collider = ring of spheres
+  | { kind: 'dodeca'; radius: number }; // collider = convex hull, see dodeca.ts
 
 export interface ObjectDef {
   id: string;
@@ -73,6 +74,13 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
     shape: { kind: 'torus', radius: 0.85, tube: 0.24, segments: 18 },
     mass: 5,
     color: PALETTE.warmWhite,
+  },
+  dodeca: {
+    id: 'dodeca',
+    label: 'Dodeka',
+    shape: { kind: 'dodeca', radius: 0.62 },
+    mass: 4,
+    color: PALETTE.indigo,
   },
 };
 

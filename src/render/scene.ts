@@ -8,6 +8,8 @@ export interface RenderContext {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  /** Translucent boundary-wall panels; hidden until walls are toggled on. */
+  wallGroup: THREE.Group;
   resize: () => void;
 }
 
@@ -29,6 +31,7 @@ export function createRenderer(canvas: HTMLCanvasElement): RenderContext {
 
   setupLights(scene);
   setupBoard(scene);
+  const wallGroup = setupWalls(scene);
 
   const resize = () => {
     const w = window.innerWidth;
@@ -40,7 +43,7 @@ export function createRenderer(canvas: HTMLCanvasElement): RenderContext {
   resize();
   window.addEventListener('resize', resize);
 
-  return { renderer, scene, camera, resize };
+  return { renderer, scene, camera, wallGroup, resize };
 }
 
 function setupLights(scene: THREE.Scene): void {
@@ -69,6 +72,16 @@ function setupLights(scene: THREE.Scene): void {
 function setupBoard(scene: THREE.Scene): void {
   const size = BOARD.size;
 
+  // Outer ground extending well beyond the board, so the world doesn't float in
+  // the void and the translucent walls have something to read against.
+  const outer = new THREE.Mesh(
+    new THREE.PlaneGeometry(size * 5, size * 5),
+    new THREE.MeshStandardMaterial({ color: 0x10141a, roughness: 1, metalness: 0 }),
+  );
+  outer.rotation.x = -Math.PI / 2;
+  outer.position.y = -0.04;
+  scene.add(outer);
+
   const board = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),
     new THREE.MeshStandardMaterial({
@@ -87,4 +100,49 @@ function setupBoard(scene: THREE.Scene): void {
   (grid.material as THREE.Material).transparent = true;
   grid.position.y = 0.001;
   scene.add(grid);
+}
+
+/** Translucent glass-like panels at the board edges. Hidden until walls toggle on. */
+function setupWalls(scene: THREE.Scene): THREE.Group {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const height = 4;
+  const half = BOARD.half - BOARD.wallInset;
+  const mat = new THREE.MeshStandardMaterial({
+    color: PALETTE.teal,
+    transparent: true,
+    opacity: 0.13,
+    roughness: 0.5,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // [position, rotationY] for the four edges. Plane spans the board width × height.
+  const edges: Array<[THREE.Vector3, number]> = [
+    [new THREE.Vector3(0, height / 2, half), 0],
+    [new THREE.Vector3(0, height / 2, -half), 0],
+    [new THREE.Vector3(half, height / 2, 0), Math.PI / 2],
+    [new THREE.Vector3(-half, height / 2, 0), Math.PI / 2],
+  ];
+
+  for (const [pos, rotY] of edges) {
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, height), mat);
+    panel.position.copy(pos);
+    panel.rotation.y = rotY;
+    group.add(panel);
+
+    // A faint bright rim along the top edge so the wall extent is easy to read.
+    const rim = new THREE.Mesh(
+      new THREE.BoxGeometry(half * 2, 0.04, 0.04),
+      new THREE.MeshBasicMaterial({ color: PALETTE.teal, transparent: true, opacity: 0.5 }),
+    );
+    rim.position.set(pos.x, height, pos.z);
+    rim.rotation.y = rotY;
+    group.add(rim);
+  }
+
+  scene.add(group);
+  return group;
 }
