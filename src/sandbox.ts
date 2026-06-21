@@ -83,6 +83,12 @@ export class Sandbox {
     return entity;
   }
 
+  /** Default starter scene — a cube plus a few mixed shapes. */
+  spawnStarterScene(): void {
+    this.spawn('cube');
+    this.spawnMany(6);
+  }
+
   /** Scatter n objects (random type if none given) — fill the board. */
   spawnMany(n: number, defId?: string): void {
     for (let i = 0; i < n; i++) {

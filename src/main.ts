@@ -9,12 +9,11 @@ import { createPanel } from './ui/panel';
 const canvas = document.getElementById('app') as HTMLCanvasElement;
 const render = createRenderer(canvas);
 const sandbox = new Sandbox(render);
-installControls(sandbox, render);
-createPanel(sandbox);
+const controls = installControls(sandbox, render);
+createPanel(sandbox, controls);
 
 // Starter scene: drop a few shapes so there is something to grab right away.
-sandbox.spawn('cube');
-sandbox.spawnMany(6);
+sandbox.spawnStarterScene();
 
 // Dev-only handle for tooling/tests (stripped from production builds).
 if (import.meta.env.DEV) {

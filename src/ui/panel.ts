@@ -6,6 +6,7 @@ import { OBJECT_LIST } from '../objects/defs';
 import { FEEL } from '../config';
 import { detonate, implode } from '../forces/detonate';
 import type { Sandbox } from '../sandbox';
+import type { Controls } from '../interaction/controls';
 
 /** Blast center — slightly above the board. */
 const BLAST_CENTER = new CANNON.Vec3(0, 0.5, 0);
@@ -53,7 +54,7 @@ const CSS = `
 }
 `;
 
-export function createPanel(sandbox: Sandbox): void {
+export function createPanel(sandbox: Sandbox, controls: Controls): void {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
@@ -89,20 +90,18 @@ export function createPanel(sandbox: Sandbox): void {
   body.appendChild(divider());
 
   // Gravity slider.
-  body.appendChild(
-    slider('Gravity', -40, 0, 0.5, FEEL.gravity, (v) => {
-      sandbox.world.gravity.set(0, v, 0);
-      sandbox.wakeAll();
-    }),
-  );
+  const gravity = slider('Gravity', -40, 0, 0.5, FEEL.gravity, (v) => {
+    sandbox.world.gravity.set(0, v, 0);
+    sandbox.wakeAll();
+  });
+  body.appendChild(gravity.field);
 
   // Bounce slider (restitution).
-  body.appendChild(
-    slider('Bounce', 0, 0.95, 0.01, FEEL.restitution, (v) => {
-      sandbox.world.defaultContactMaterial.restitution = v;
-      sandbox.wakeAll();
-    }),
-  );
+  const bounce = slider('Bounce', 0, 0.95, 0.01, FEEL.restitution, (v) => {
+    sandbox.world.defaultContactMaterial.restitution = v;
+    sandbox.wakeAll();
+  });
+  body.appendChild(bounce.field);
 
   body.appendChild(divider());
 
@@ -130,8 +129,12 @@ export function createPanel(sandbox: Sandbox): void {
   actionRow.appendChild(button('Clear', () => sandbox.clear()));
   actionRow.appendChild(
     button('Reset', () => {
+      // Back to the initial state: empty board, default feel, default camera, starter scene.
       sandbox.clear();
-      sandbox.spawnMany(8);
+      setSlider(gravity.input, FEEL.gravity);
+      setSlider(bounce.input, FEEL.restitution);
+      controls.resetCamera();
+      sandbox.spawnStarterScene();
     }),
   );
   body.appendChild(actionRow);
@@ -251,6 +254,11 @@ function chargeButton(
   return b;
 }
 
+interface Slider {
+  field: HTMLElement;
+  input: HTMLInputElement;
+}
+
 function slider(
   label: string,
   min: number,
@@ -258,7 +266,7 @@ function slider(
   step: number,
   value: number,
   onInput: (v: number) => void,
-): HTMLElement {
+): Slider {
   const field = el('div', 'phys-field');
   const lab = document.createElement('label');
   const input = document.createElement('input');
@@ -275,5 +283,11 @@ function slider(
   };
   field.appendChild(lab);
   field.appendChild(input);
-  return field;
+  return { field, input };
+}
+
+/** Set a slider's value and run its handler (applies the value + updates the label). */
+function setSlider(input: HTMLInputElement, value: number): void {
+  input.value = String(value);
+  input.dispatchEvent(new Event('input'));
 }

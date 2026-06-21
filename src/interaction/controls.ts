@@ -11,7 +11,12 @@ import type { Sandbox } from '../sandbox';
 
 const TARGET = new THREE.Vector3(0, 0.5, 0);
 
-export function installControls(sandbox: Sandbox, render: RenderContext): void {
+export interface Controls {
+  /** Restore the camera to its default angle/zoom. */
+  resetCamera: () => void;
+}
+
+export function installControls(sandbox: Sandbox, render: RenderContext): Controls {
   const { camera, renderer } = render;
   const dom = renderer.domElement;
   const raycaster = new THREE.Raycaster();
@@ -19,9 +24,12 @@ export function installControls(sandbox: Sandbox, render: RenderContext): void {
 
   // --- Orbit state (spherical coordinates around TARGET) ---
   const offset = camera.position.clone().sub(TARGET);
-  let radius = offset.length();
-  let phi = Math.acos(offset.y / radius); // angle from +Y
-  let theta = Math.atan2(offset.x, offset.z); // turn around Y
+  const initialRadius = offset.length();
+  const initialPhi = Math.acos(offset.y / initialRadius); // angle from +Y
+  const initialTheta = Math.atan2(offset.x, offset.z); // turn around Y
+  let radius = initialRadius;
+  let phi = initialPhi;
+  let theta = initialTheta;
 
   const updateCamera = () => {
     phi = Math.max(0.12, Math.min(1.5, phi));
@@ -149,4 +157,13 @@ export function installControls(sandbox: Sandbox, render: RenderContext): void {
     },
     { passive: false },
   );
+
+  return {
+    resetCamera: () => {
+      radius = initialRadius;
+      phi = initialPhi;
+      theta = initialTheta;
+      updateCamera();
+    },
+  };
 }
