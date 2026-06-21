@@ -50,6 +50,9 @@ export const BOARD = {
   half: 9,
   /** Walls sit this far inside the edge. */
   wallInset: 0.5,
+  /** Wall height — physics and the visible panel share this, so the wall is solid
+   *  exactly as far up as you can see it (no invisible wall above the panel). */
+  wallHeight: 8,
 } as const;
 
 export const SIM = {

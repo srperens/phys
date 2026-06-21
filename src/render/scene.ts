@@ -107,7 +107,7 @@ function setupWalls(scene: THREE.Scene): THREE.Group {
   const group = new THREE.Group();
   group.visible = false;
 
-  const height = 4;
+  const height = BOARD.wallHeight;
   const half = BOARD.half - BOARD.wallInset;
   const mat = new THREE.MeshStandardMaterial({
     color: PALETTE.teal,

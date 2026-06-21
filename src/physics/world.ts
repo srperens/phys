@@ -52,22 +52,23 @@ export function createGround(world: CANNON.World): CANNON.Body {
 }
 
 /**
- * Four invisible, inward-facing wall planes around the board so shapes can't
- * skid or bounce off the edge. Returned but NOT added to the world — the sandbox
- * toggles them on/off. `boundary` is just inside the visible board (half-size 12).
+ * Four invisible boundary walls around the board so shapes can't skid or bounce off
+ * the edge. Finite-height BOXES (not infinite planes) so they match the visible wall
+ * panels exactly — solid only as far up as you can see, with no invisible wall above.
+ * Returned but NOT added to the world — the sandbox toggles them on/off.
  */
 export function createWalls(boundary = BOARD.half - BOARD.wallInset): CANNON.Body[] {
-  const localNormal = new CANNON.Vec3(0, 0, 1); // CANNON.Plane faces +Z
-  const specs: Array<{ pos: CANNON.Vec3; normal: CANNON.Vec3 }> = [
-    { pos: new CANNON.Vec3(boundary, 0, 0), normal: new CANNON.Vec3(-1, 0, 0) },
-    { pos: new CANNON.Vec3(-boundary, 0, 0), normal: new CANNON.Vec3(1, 0, 0) },
-    { pos: new CANNON.Vec3(0, 0, boundary), normal: new CANNON.Vec3(0, 0, -1) },
-    { pos: new CANNON.Vec3(0, 0, -boundary), normal: new CANNON.Vec3(0, 0, 1) },
+  const h = BOARD.wallHeight / 2;
+  const t = 0.15; // half thickness
+  const specs: Array<{ pos: CANNON.Vec3; half: CANNON.Vec3 }> = [
+    { pos: new CANNON.Vec3(boundary, h, 0), half: new CANNON.Vec3(t, h, boundary) },
+    { pos: new CANNON.Vec3(-boundary, h, 0), half: new CANNON.Vec3(t, h, boundary) },
+    { pos: new CANNON.Vec3(0, h, boundary), half: new CANNON.Vec3(boundary, h, t) },
+    { pos: new CANNON.Vec3(0, h, -boundary), half: new CANNON.Vec3(boundary, h, t) },
   ];
-  return specs.map(({ pos, normal }) => {
-    const body = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane() });
+  return specs.map(({ pos, half }) => {
+    const body = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Box(half) });
     body.position.copy(pos);
-    body.quaternion.setFromVectors(localNormal, normal);
     return body;
   });
 }

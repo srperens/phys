@@ -78,8 +78,8 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
   dodeca: {
     id: 'dodeca',
     label: 'Dodeka',
-    shape: { kind: 'dodeca', radius: 0.62 },
-    mass: 4,
+    shape: { kind: 'dodeca', radius: 0.8 },
+    mass: 6,
     color: PALETTE.indigo,
   },
 };

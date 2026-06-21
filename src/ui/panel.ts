@@ -130,12 +130,12 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   const forceRow = el('div', 'phys-row');
   forceRow.appendChild(
     chargeButton('Detonate', 'rgba(224,122,95,0.45)', (r) =>
-      detonate(sandbox.dynamicBodies, BLAST_CENTER, { strength: 30 + r * 160, spin: 16 + r * 28 }),
+      detonate(sandbox.dynamicBodies, BLAST_CENTER, { strength: 50 + r * 320, spin: 20 + r * 40 }),
     ),
   );
   forceRow.appendChild(
     chargeButton('Implode', 'rgba(79,182,168,0.45)', (r) =>
-      implode(sandbox.dynamicBodies, BLAST_CENTER, { strength: 30 + r * 150 }),
+      implode(sandbox.dynamicBodies, BLAST_CENTER, { strength: 50 + r * 300 }),
     ),
   );
   body.appendChild(forceRow);
