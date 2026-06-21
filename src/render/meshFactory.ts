@@ -1,6 +1,7 @@
 /**
- * ObjectDef → THREE.Mesh. Mirrors the same ShapeDef as bodyFactory.
- * Matte material (matte > glossy) per the aesthetic.
+ * ObjectDef → geometry + material for rendering. Mirrors the same ShapeDef as
+ * bodyFactory. Matte material (matte > glossy) per the aesthetic. Built once per
+ * shape type and shared across all instances (see render/instances.ts).
  */
 import * as THREE from 'three';
 import type { ObjectDef } from '../objects/defs';
@@ -8,9 +9,8 @@ import { prismPositions, prismUVs } from '../objects/prism';
 import { GOMBOC_PROFILE } from '../objects/gomboc';
 import { checkerTexture } from './textures';
 
-export function createMesh(def: ObjectDef): THREE.Mesh {
-  const geometry = makeGeometry(def);
-  const material = new THREE.MeshStandardMaterial({
+export function buildMaterial(def: ObjectDef): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
     color: def.color,
     roughness: 0.7,
     metalness: 0.05,
@@ -18,13 +18,9 @@ export function createMesh(def: ObjectDef): THREE.Mesh {
     map: checkerTexture(),
     flatShading: def.shape.kind === 'prism' || def.shape.kind === 'dodeca',
   });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
 }
 
-function makeGeometry(def: ObjectDef): THREE.BufferGeometry {
+export function buildGeometry(def: ObjectDef): THREE.BufferGeometry {
   switch (def.shape.kind) {
     case 'box': {
       const [x, y, z] = def.shape.halfExtents;

@@ -151,7 +151,8 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
     raycaster.setFromCamera(ndc, camera);
     const hits = raycaster.intersectObjects(sandbox.pickables, false);
     const hit = hits[0];
-    const body = hit?.object.userData.body as CANNON.Body | undefined;
+    const body =
+      hit && hit.instanceId != null ? sandbox.bodyAt(hit.object, hit.instanceId) : undefined;
 
     if (hit && body) {
       mode = 'grab';

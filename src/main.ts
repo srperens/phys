@@ -1,6 +1,7 @@
 /**
  * main — glues the layers together and runs the loop.
  */
+import * as THREE from 'three';
 import { createRenderer } from './render/scene';
 import { Sandbox } from './sandbox';
 import { installControls } from './interaction/controls';
@@ -17,7 +18,7 @@ sandbox.spawnStarterScene();
 
 // Dev-only handle for tooling/tests (stripped from production builds).
 if (import.meta.env.DEV) {
-  (window as unknown as { __phys?: unknown }).__phys = { sandbox, render };
+  (window as unknown as { __phys?: unknown }).__phys = { sandbox, render, THREE };
 }
 
 let last = performance.now();

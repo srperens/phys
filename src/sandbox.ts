@@ -6,19 +6,19 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { createWorld, installContactMaterial, createGround, createWalls, stepWorld } from './physics/world';
 import { createBody } from './physics/bodyFactory';
-import { createMesh } from './render/meshFactory';
+import { InstanceManager } from './render/instances';
 import { OBJECT_DEFS, OBJECT_LIST, type ObjectDef } from './objects/defs';
 import type { RenderContext } from './render/scene';
 
 export interface Entity {
   def: ObjectDef;
   body: CANNON.Body;
-  mesh: THREE.Mesh;
 }
 
 export class Sandbox {
   readonly world: CANNON.World;
   private readonly render: RenderContext;
+  private readonly instances: InstanceManager;
   private readonly entities: Entity[] = [];
   private readonly constraints: CANNON.Constraint[] = [];
   private readonly walls: CANNON.Body[] = createWalls();
@@ -30,6 +30,7 @@ export class Sandbox {
 
   constructor(render: RenderContext) {
     this.render = render;
+    this.instances = new InstanceManager(render.scene);
     this.world = createWorld();
     installContactMaterial(this.world);
     createGround(this.world);
@@ -39,9 +40,14 @@ export class Sandbox {
     return this.entities.length;
   }
 
-  /** Meshes that can be raycast against (grip). */
+  /** Instanced meshes that can be raycast against (grip). */
   get pickables(): THREE.Object3D[] {
-    return this.entities.map((e) => e.mesh);
+    return this.instances.pickables;
+  }
+
+  /** Resolve a raycast hit (mesh + instanceId) to its body. */
+  bodyAt(object: THREE.Object3D, instanceId: number): CANNON.Body | undefined {
+    return this.instances.bodyAt(object, instanceId);
   }
 
   /** All dynamic bodies (for detonate/implode). */
@@ -74,13 +80,9 @@ export class Sandbox {
       this.rand() * Math.PI,
     );
     this.world.addBody(body);
+    this.instances.add(def, body);
 
-    const mesh = createMesh(def);
-    // Fast lookup on raycast: mesh → body.
-    mesh.userData.body = body;
-    this.render.scene.add(mesh);
-
-    const entity: Entity = { def, body, mesh };
+    const entity: Entity = { def, body };
     this.entities.push(entity);
     return entity;
   }
@@ -156,21 +158,16 @@ export class Sandbox {
     this.constraints.length = 0;
     for (const e of this.entities) {
       this.world.removeBody(e.body);
-      this.render.scene.remove(e.mesh);
-      e.mesh.geometry.dispose();
-      (e.mesh.material as THREE.Material).dispose();
     }
     this.entities.length = 0;
+    this.instances.clear();
   }
 
-  /** Advance the physics and mirror it to the meshes. */
+  /** Advance the physics and mirror it into the instance matrices. */
   update(dt: number): void {
     if (!this.paused) {
       stepWorld(this.world, dt);
     }
-    for (const e of this.entities) {
-      e.mesh.position.copy(e.body.position as unknown as THREE.Vector3);
-      e.mesh.quaternion.copy(e.body.quaternion as unknown as THREE.Quaternion);
-    }
+    this.instances.sync();
   }
 }
