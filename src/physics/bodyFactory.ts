@@ -12,6 +12,10 @@ export function createBody(def: ObjectDef): CANNON.Body {
     linearDamping: FEEL.linearDamping,
     angularDamping: FEEL.angularDamping,
   });
+  // Let near-still bodies sleep promptly so resting piles stop micro-bouncing
+  // (cannon applies restitution even to resting contacts → otherwise they jitter).
+  body.sleepSpeedLimit = FEEL.sleepSpeedLimit;
+  body.sleepTimeLimit = FEEL.sleepTimeLimit;
   if (def.shape.kind === 'torus') {
     addTorusShapes(body, def.shape.radius, def.shape.tube, def.shape.segments);
   } else {

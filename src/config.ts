@@ -14,9 +14,10 @@ export const FEEL = {
   /** Friction between shapes and against the board. */
   friction: 0.42,
 
-  /** Throws coast and settle without sticking. */
-  linearDamping: 0.12,
-  angularDamping: 0.12,
+  /** Throws coast and settle without sticking; a touch of extra angular damping
+   *  helps resting piles stop boiling. */
+  linearDamping: 0.15,
+  angularDamping: 0.2,
 
   /**
    * Grip strength (M2). Constant, NOT mass-scaled — that is the whole point:
@@ -24,18 +25,23 @@ export const FEEL = {
    */
   gripMaxForce: 500,
 
-  /** Solver iterations. High count keeps stacks stable and stops chain links from
-   *  being forced through each other when pulled hard. */
+  /** Solver iterations. More iterations resolve deep-pile overlaps cleanly so the
+   *  pile doesn't boil; the chain stays together via link constraints (spawnChain). */
   solverIterations: 30,
 
-  /** Contact stiffness/relaxation — a bit stiffer than cannon's 1e7 default so rigid
-   *  rings resist being squeezed through one another, but low enough to stay stable
-   *  at a 1/60 timestep (too high → the solver explodes). */
-  contactStiffness: 2e7,
-  contactRelaxation: 3,
+  /** Contact stiffness/relaxation — moderate stiffness with softer relaxation so
+   *  overlap correction is gentle (doesn't inject jitter velocity) and stable. */
+  contactStiffness: 1e7,
+  contactRelaxation: 4,
 
   /** Resting shapes fall asleep (looks good + saves CPU). Wake on grip/detonate. */
   allowSleep: true,
+
+  /** Sleep tuning — a shape settles to sleep once it's slow for this long, which
+   *  freezes out the tiny restitution-driven jitter in resting piles. A fairly high
+   *  speed limit makes piles snap to rest (reads as solid/rigid) rather than shiver. */
+  sleepSpeedLimit: 0.5,
+  sleepTimeLimit: 0.3,
 } as const;
 
 /** The board (and grid). Walls sit just inside this. Single source of truth. */

@@ -100,23 +100,33 @@ export class Sandbox {
   }
 
   /**
-   * Torus chain (M5): N tori genuinely threaded through each other — NO constraints.
-   * Every other link is rotated 90° so the holes alternate; each link captures its
-   * neighbor's near arc inside its hole. The links hold together purely because the
-   * sphere-ring collider stops the tube from passing back through the ring, exactly
-   * like real chain links. Spacing ≈ ring radius so neighbors stay interlocked.
+   * Torus chain (M5): N tori threaded through each other (alternating hole axis so
+   * they interlock), PLUS a DistanceConstraint between neighbours at the distance
+   * they naturally rest at. The interlocking colliders give the real ring-on-ring
+   * contact; the constraint is the unbreakable backbone so a hard pull can't squeeze
+   * one link's tube through another. The distance matches the natural rest gap, so
+   * visually it hangs like a real chain (no clumping) — it just won't come apart.
    */
   spawnChain(links = 7): void {
     const def = OBJECT_DEFS.torus;
     if (def.shape.kind !== 'torus') return;
-    const spacing = def.shape.radius;
+    // ~1.35× the ring radius: links stay threaded, and it's where collision rests them.
+    const spacing = def.shape.radius * 1.35;
     const startX = -(links - 1) * spacing * 0.5;
+    let prev: CANNON.Body | undefined;
 
     for (let i = 0; i < links; i++) {
       const entity = this.spawn('torus', new CANNON.Vec3(startX + i * spacing, 7, 0));
       if (!entity) continue;
       // Alternate hole axis (Z / Y) so consecutive links interlock.
       entity.body.quaternion.setFromEuler(i % 2 === 0 ? 0 : Math.PI / 2, 0, 0);
+
+      if (prev) {
+        const c = new CANNON.DistanceConstraint(prev, entity.body, spacing, 1e6);
+        this.world.addConstraint(c);
+        this.constraints.push(c);
+      }
+      prev = entity.body;
     }
   }
 
