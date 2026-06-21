@@ -36,6 +36,10 @@ const CSS = `
 .phys-panel button:hover { background: rgba(255,255,255,0.12); }
 .phys-panel button:active { background: rgba(255,255,255,0.18); }
 .phys-panel button.accent { border-color: rgba(224,122,95,0.5); color: #f0b6a6; }
+.phys-charge { position: relative; overflow: hidden; }
+.phys-charge .phys-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  pointer-events: none; transition: width 0.04s linear; }
+.phys-charge .phys-label { position: relative; z-index: 1; }
 .phys-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0; }
 .phys-stat { display: flex; justify-content: space-between; color: #9aa7b3; }
 .phys-stat b { color: #e7ecf1; font-weight: 600; }
@@ -102,12 +106,18 @@ export function createPanel(sandbox: Sandbox): void {
 
   body.appendChild(divider());
 
-  // Forces.
+  // Forces — hold to charge up the blast, release to fire.
   const forceRow = el('div', 'phys-row');
-  const detonateBtn = button('Detonate', () => detonate(sandbox.dynamicBodies, BLAST_CENTER));
-  detonateBtn.classList.add('accent');
-  forceRow.appendChild(detonateBtn);
-  forceRow.appendChild(button('Implode', () => implode(sandbox.dynamicBodies, BLAST_CENTER)));
+  forceRow.appendChild(
+    chargeButton('Detonate', 'rgba(224,122,95,0.45)', (r) =>
+      detonate(sandbox.dynamicBodies, BLAST_CENTER, { strength: 30 + r * 160, spin: 16 + r * 28 }),
+    ),
+  );
+  forceRow.appendChild(
+    chargeButton('Implode', 'rgba(79,182,168,0.45)', (r) =>
+      implode(sandbox.dynamicBodies, BLAST_CENTER, { strength: 30 + r * 150 }),
+    ),
+  );
   body.appendChild(forceRow);
 
   // Sim controls.
@@ -185,6 +195,60 @@ function repeatButton(label: string, action: () => void, interval = 110): HTMLBu
 
 function divider(): HTMLElement {
   return el('div', 'phys-divider');
+}
+
+/**
+ * Charge button: hold to fill up power (0→1 over CHARGE_MS), release to fire.
+ * `fire` receives the charge ratio; a quick tap fires near 0, a full hold near 1.
+ */
+function chargeButton(
+  label: string,
+  fillColor: string,
+  fire: (ratio: number) => void,
+  chargeMs = 1400,
+): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.className = 'phys-charge';
+
+  const fill = document.createElement('span');
+  fill.className = 'phys-fill';
+  fill.style.background = fillColor;
+  const text = document.createElement('span');
+  text.className = 'phys-label';
+  text.textContent = label;
+  b.appendChild(fill);
+  b.appendChild(text);
+
+  let raf = 0;
+  let start = 0;
+  let charging = false;
+  const ratioNow = () => Math.min(1, (performance.now() - start) / chargeMs);
+
+  const tick = () => {
+    if (!charging) return;
+    fill.style.width = `${ratioNow() * 100}%`;
+    raf = requestAnimationFrame(tick);
+  };
+
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    charging = true;
+    start = performance.now();
+    fill.style.width = '0%';
+    b.setPointerCapture(e.pointerId);
+    tick();
+  });
+
+  const release = () => {
+    if (!charging) return;
+    charging = false;
+    cancelAnimationFrame(raf);
+    fire(ratioNow());
+    fill.style.width = '0%';
+  };
+  b.addEventListener('pointerup', release);
+  b.addEventListener('pointercancel', release);
+  return b;
 }
 
 function slider(
