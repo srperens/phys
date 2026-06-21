@@ -1,28 +1,31 @@
 /**
- * Instanced rendering. One THREE.InstancedMesh per shape type (all instances of a
- * type share geometry + material + colour), so hundreds of objects cost a handful of
- * draw calls instead of one each. Bodies are appended per type; every frame their
- * transforms are written into the instance matrices.
+ * Instanced rendering, driven by the worker's transform stream (no main-thread
+ * bodies). One THREE.InstancedMesh per shape type, so hundreds of objects cost a
+ * handful of draw calls. Owns the mapping between a flat spawn index (the worker's
+ * body order) and a (type, instance slot), used both to write transforms and to
+ * resolve a raycast hit back to a worker body index.
  */
 import * as THREE from 'three';
-import type * as CANNON from 'cannon-es';
 import type { ObjectDef } from '../objects/defs';
+import { STRIDE } from '../physics/protocol';
 import { buildGeometry, buildMaterial } from './meshFactory';
 
-/** Starting capacity per type; grows (doubles) if a type exceeds it. */
 const INITIAL_CAPACITY = 256;
 
 interface TypeGroup {
   def: ObjectDef;
   mesh: THREE.InstancedMesh;
-  bodies: CANNON.Body[];
+  count: number;
+  /** flatIndices[slot] = the worker's flat body index for that instance. */
+  flatIndices: number[];
 }
 
 export class InstanceManager {
   private readonly scene: THREE.Scene;
   private readonly groups = new Map<string, TypeGroup>();
+  /** order[flatIndex] = which group + slot that body draws into. */
+  private readonly order: Array<{ group: TypeGroup; slot: number }> = [];
 
-  // Reused scratch objects for matrix composition.
   private readonly m = new THREE.Matrix4();
   private readonly p = new THREE.Vector3();
   private readonly q = new THREE.Quaternion();
@@ -32,7 +35,6 @@ export class InstanceManager {
     this.scene = scene;
   }
 
-  /** InstancedMeshes for raycasting. */
   get pickables(): THREE.Object3D[] {
     return [...this.groups.values()].map((g) => g.mesh);
   }
@@ -42,11 +44,9 @@ export class InstanceManager {
     mesh.count = 0;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    // Instances are spread across the board; the default bounding sphere would
-    // cull them wrongly, so skip frustum culling.
     mesh.frustumCulled = false;
-    // Large fixed bounding sphere: instances move every frame, so a cached/computed
-    // sphere would go stale and make the raycast early-out wrongly reject hits.
+    // Large fixed bounding sphere: instances move every frame, so a computed sphere
+    // would go stale and make the raycast early-out wrongly reject hits.
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1000);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     return mesh;
@@ -55,8 +55,7 @@ export class InstanceManager {
   private group(def: ObjectDef): TypeGroup {
     let g = this.groups.get(def.id);
     if (!g) {
-      g = { def, mesh: this.makeMesh(def, INITIAL_CAPACITY), bodies: [] };
-      // Lets the picker resolve an instanceId back to its body.
+      g = { def, mesh: this.makeMesh(def, INITIAL_CAPACITY), count: 0, flatIndices: [] };
       g.mesh.userData.group = g;
       this.scene.add(g.mesh);
       this.groups.set(def.id, g);
@@ -64,48 +63,55 @@ export class InstanceManager {
     return g;
   }
 
-  /** Double a type's capacity, preserving existing instances. */
   private grow(g: TypeGroup): void {
-    const bigger = this.makeMesh(g.def, g.mesh.count * 2);
+    const bigger = this.makeMesh(g.def, g.mesh.instanceMatrix.count * 2);
+    bigger.count = g.count;
+    bigger.userData.group = g;
     this.scene.remove(g.mesh);
     g.mesh.dispose();
-    bigger.userData.group = g;
     this.scene.add(bigger);
     g.mesh = bigger;
   }
 
-  add(def: ObjectDef, body: CANNON.Body): void {
+  /** Register a new body (flat index = current order length). */
+  add(def: ObjectDef): void {
     const g = this.group(def);
-    if (g.bodies.length >= g.mesh.instanceMatrix.count) this.grow(g);
-    g.bodies.push(body);
-    g.mesh.count = g.bodies.length;
-  }
-
-  /** Resolve a raycast hit (instanced mesh + instanceId) back to its body. */
-  bodyAt(object: THREE.Object3D, instanceId: number): CANNON.Body | undefined {
-    const g = object.userData.group as TypeGroup | undefined;
-    return g?.bodies[instanceId];
+    if (g.count >= g.mesh.instanceMatrix.count) this.grow(g);
+    const slot = g.count;
+    g.flatIndices[slot] = this.order.length;
+    g.count += 1;
+    g.mesh.count = g.count;
+    this.order.push({ group: g, slot });
   }
 
   clear(): void {
+    this.order.length = 0;
     for (const g of this.groups.values()) {
-      g.bodies.length = 0;
+      g.count = 0;
       g.mesh.count = 0;
+      g.flatIndices.length = 0;
     }
   }
 
-  /** Write every body's transform into its instance matrix. */
-  sync(): void {
-    for (const g of this.groups.values()) {
-      const { mesh, bodies } = g;
-      for (let i = 0; i < bodies.length; i++) {
-        const b = bodies[i];
-        this.p.set(b.position.x, b.position.y, b.position.z);
-        this.q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
-        this.m.compose(this.p, this.q, this.s);
-        mesh.setMatrixAt(i, this.m);
-      }
-      if (bodies.length > 0) mesh.instanceMatrix.needsUpdate = true;
+  /** Resolve a raycast hit (instanced mesh + instanceId) to a worker body index. */
+  indexAt(object: THREE.Object3D, instanceId: number): number | undefined {
+    const g = object.userData.group as TypeGroup | undefined;
+    return g?.flatIndices[instanceId];
+  }
+
+  /** Write the worker's transform frame into the instance matrices. */
+  applyFrame(count: number, t: Float32Array): void {
+    const n = Math.min(count, this.order.length);
+    const touched = new Set<TypeGroup>();
+    for (let i = 0; i < n; i++) {
+      const { group, slot } = this.order[i];
+      const o = i * STRIDE;
+      this.p.set(t[o], t[o + 1], t[o + 2]);
+      this.q.set(t[o + 3], t[o + 4], t[o + 5], t[o + 6]);
+      this.m.compose(this.p, this.q, this.s);
+      group.mesh.setMatrixAt(slot, this.m);
+      touched.add(group);
     }
+    for (const g of touched) g.mesh.instanceMatrix.needsUpdate = true;
   }
 }

@@ -1,15 +1,13 @@
 /**
  * Control panel — glassy, matte, no gradients/glow. Collapsible on mobile.
  */
-import * as CANNON from 'cannon-es';
 import { OBJECT_LIST } from '../objects/defs';
 import { FEEL } from '../config';
-import { detonate, implode } from '../forces/detonate';
 import type { Sandbox } from '../sandbox';
 import type { Controls } from '../interaction/controls';
 
 /** Blast center — slightly above the board. */
-const BLAST_CENTER = new CANNON.Vec3(0, 0.5, 0);
+const BLAST_CENTER: [number, number, number] = [0, 0.5, 0];
 
 const CSS = `
 .phys-panel {
@@ -112,15 +110,13 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
 
   // Gravity slider.
   const gravity = slider('Gravity', -40, 0, 0.5, FEEL.gravity, (v) => {
-    sandbox.world.gravity.set(0, v, 0);
-    sandbox.wakeAll();
+    sandbox.setGravity(v);
   });
   body.appendChild(gravity.field);
 
   // Bounce slider (restitution).
   const bounce = slider('Bounce', 0, 0.95, 0.01, FEEL.restitution, (v) => {
-    sandbox.world.defaultContactMaterial.restitution = v;
-    sandbox.wakeAll();
+    sandbox.setRestitution(v);
   });
   body.appendChild(bounce.field);
 
@@ -130,12 +126,12 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   const forceRow = el('div', 'phys-row');
   forceRow.appendChild(
     chargeButton('Detonate', 'rgba(224,122,95,0.45)', (r) =>
-      detonate(sandbox.dynamicBodies, BLAST_CENTER, { strength: 50 + r * 320, spin: 20 + r * 40 }),
+      sandbox.detonate(BLAST_CENTER, 50 + r * 320, 20 + r * 40),
     ),
   );
   forceRow.appendChild(
     chargeButton('Implode', 'rgba(79,182,168,0.45)', (r) =>
-      implode(sandbox.dynamicBodies, BLAST_CENTER, { strength: 50 + r * 300 }),
+      sandbox.implode(BLAST_CENTER, 50 + r * 300),
     ),
   );
   body.appendChild(forceRow);
@@ -155,7 +151,7 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   // Sim controls.
   const actionRow = el('div', 'phys-row-3');
   const pauseBtn = button('Pause', () => {
-    sandbox.paused = !sandbox.paused;
+    sandbox.setPaused(!sandbox.paused);
     pauseBtn.textContent = sandbox.paused ? 'Play' : 'Pause';
   });
   actionRow.appendChild(pauseBtn);

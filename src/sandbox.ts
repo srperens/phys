@@ -1,28 +1,25 @@
 /**
- * Sandbox — glues physics and rendering via entity pairs (body ↔ mesh).
- * Physics owns the truth; every frame the body is mirrored to the mesh.
+ * Sandbox — orchestrates the physics worker and instanced rendering. Physics runs in
+ * the worker (PhysicsClient); the main thread only sends commands and renders from the
+ * streamed transforms (applied straight into the instance matrices). Keeps light
+ * bookkeeping (object count, wall/pause mirrors) for the UI.
  */
 import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-import { createWorld, installContactMaterial, createGround, createWalls, stepWorld } from './physics/world';
-import { createBody } from './physics/bodyFactory';
 import { InstanceManager } from './render/instances';
-import { OBJECT_DEFS, OBJECT_LIST, type ObjectDef } from './objects/defs';
-import { BOARD } from './config';
+import { PhysicsClient } from './physics/physicsClient';
+import { OBJECT_DEFS, OBJECT_LIST } from './objects/defs';
 import type { RenderContext } from './render/scene';
 
-export interface Entity {
-  def: ObjectDef;
-  body: CANNON.Body;
-}
+type Vec3 = [number, number, number];
+type Quat = [number, number, number, number];
 
 export class Sandbox {
-  readonly world: CANNON.World;
   private readonly render: RenderContext;
   private readonly instances: InstanceManager;
-  private readonly entities: Entity[] = [];
-  private readonly constraints: CANNON.Constraint[] = [];
-  private readonly walls: CANNON.Body[] = createWalls();
+  private readonly physics: PhysicsClient;
+  private readonly tmpQuat = new THREE.Quaternion();
+  private readonly tmpEuler = new THREE.Euler();
+  private _count = 0;
   paused = false;
   wallsEnabled = false;
 
@@ -32,13 +29,11 @@ export class Sandbox {
   constructor(render: RenderContext) {
     this.render = render;
     this.instances = new InstanceManager(render.scene);
-    this.world = createWorld();
-    installContactMaterial(this.world);
-    createGround(this.world);
+    this.physics = new PhysicsClient((count, t) => this.instances.applyFrame(count, t));
   }
 
   get count(): number {
-    return this.entities.length;
+    return this._count;
   }
 
   /** Instanced meshes that can be raycast against (grip). */
@@ -46,55 +41,35 @@ export class Sandbox {
     return this.instances.pickables;
   }
 
-  /** Resolve a raycast hit (mesh + instanceId) to its body. */
-  bodyAt(object: THREE.Object3D, instanceId: number): CANNON.Body | undefined {
-    return this.instances.bodyAt(object, instanceId);
+  /** Resolve a raycast hit (mesh + instanceId) to a worker body index. */
+  indexAt(object: THREE.Object3D, instanceId: number): number | undefined {
+    return this.instances.indexAt(object, instanceId);
   }
 
-  /** All dynamic bodies (for detonate/implode). */
-  get dynamicBodies(): CANNON.Body[] {
-    return this.entities.map((e) => e.body);
-  }
-
-  /** Randomize a little so stacks/piles form on their own. */
   private rand(): number {
     this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
     return this.seed / 0x7fffffff;
   }
 
-  spawn(defId: string, position?: CANNON.Vec3): Entity | undefined {
+  private randomQuat(): Quat {
+    this.tmpEuler.set(this.rand() * Math.PI, this.rand() * Math.PI, this.rand() * Math.PI);
+    this.tmpQuat.setFromEuler(this.tmpEuler);
+    return [this.tmpQuat.x, this.tmpQuat.y, this.tmpQuat.z, this.tmpQuat.w];
+  }
+
+  spawn(defId: string, position?: Vec3): void {
     const def = OBJECT_DEFS[defId];
-    if (!def) return undefined;
-
-    const body = createBody(def);
-    body.position.copy(
-      position ??
-        new CANNON.Vec3(
-          (this.rand() - 0.5) * 5,
-          6 + this.rand() * 4,
-          (this.rand() - 0.5) * 5,
-        ),
-    );
-    body.quaternion.setFromEuler(
-      this.rand() * Math.PI,
-      this.rand() * Math.PI,
-      this.rand() * Math.PI,
-    );
-    this.world.addBody(body);
-    this.instances.add(def, body);
-
-    const entity: Entity = { def, body };
-    this.entities.push(entity);
-    return entity;
+    if (!def) return;
+    const pos: Vec3 = position ?? [
+      (this.rand() - 0.5) * 5,
+      6 + this.rand() * 4,
+      (this.rand() - 0.5) * 5,
+    ];
+    this.physics.spawn(defId, pos, this.randomQuat());
+    this.instances.add(def);
+    this._count += 1;
   }
 
-  /** Default starter scene — a cube plus a few mixed shapes. */
-  spawnStarterScene(): void {
-    this.spawn('cube');
-    this.spawnMany(6);
-  }
-
-  /** Scatter n objects (random type if none given) — fill the board. */
   spawnMany(n: number, defId?: string): void {
     for (let i = 0; i < n; i++) {
       const id = defId ?? OBJECT_LIST[Math.floor(this.rand() * OBJECT_LIST.length)].id;
@@ -102,94 +77,63 @@ export class Sandbox {
     }
   }
 
-  /**
-   * Torus chain (M5): N tori threaded deeply through each other (alternating hole
-   * axis), PLUS a DistanceConstraint between neighbours held at the ring radius.
-   *
-   * The small spacing (= ring radius) keeps them DEEPLY threaded: to come side-by-side
-   * the rings would have to heavily overlap, which collision strongly resists — so they
-   * stay genuinely interlocked, not beads-on-a-string. The constraint is the unbreakable
-   * backbone so a hard pull can't squeeze one link's tube out through another.
-   */
-  spawnChain(links = 7): void {
-    const def = OBJECT_DEFS.torus;
-    if (def.shape.kind !== 'torus') return;
-    const spacing = def.shape.radius; // deep threading → clearly interlocked
-    const startX = -(links - 1) * spacing * 0.5;
-    let prev: CANNON.Body | undefined;
-
-    for (let i = 0; i < links; i++) {
-      const entity = this.spawn('torus', new CANNON.Vec3(startX + i * spacing, 7, 0));
-      if (!entity) continue;
-      // Alternate hole axis (Z / Y) so consecutive links interlock.
-      entity.body.quaternion.setFromEuler(i % 2 === 0 ? 0 : Math.PI / 2, 0, 0);
-
-      if (prev) {
-        const c = new CANNON.DistanceConstraint(prev, entity.body, spacing, 1e6);
-        this.world.addConstraint(c);
-        this.constraints.push(c);
-      }
-      prev = entity.body;
+  /** Worker builds the linked chain; main just registers the 7 torus instances. */
+  spawnChain(): void {
+    this.physics.spawnChain();
+    for (let i = 0; i < 7; i++) {
+      this.instances.add(OBJECT_DEFS.torus);
+      this._count += 1;
     }
   }
 
-  /** Toggle the invisible boundary walls. */
-  setWalls(on: boolean): void {
-    if (on === this.wallsEnabled) return;
-    this.wallsEnabled = on;
-    for (const w of this.walls) {
-      if (on) this.world.addBody(w);
-      else this.world.removeBody(w);
-    }
-    this.render.wallGroup.visible = on; // show/hide the translucent panels
-    this.wakeAll();
-  }
-
-  /** Wake all sleeping bodies — e.g. when gravity/bounce changes or on detonate. */
-  wakeAll(): void {
-    for (const e of this.entities) {
-      e.body.wakeUp();
-    }
+  spawnStarterScene(): void {
+    this.spawn('cube');
+    this.spawnMany(6);
   }
 
   clear(): void {
-    for (const c of this.constraints) {
-      this.world.removeConstraint(c);
-    }
-    this.constraints.length = 0;
-    for (const e of this.entities) {
-      this.world.removeBody(e.body);
-    }
-    this.entities.length = 0;
+    this.physics.clear();
     this.instances.clear();
+    this._count = 0;
   }
 
-  /** Advance the physics and mirror it into the instance matrices. */
-  update(dt: number): void {
-    if (!this.paused) {
-      stepWorld(this.world, dt);
-      if (this.wallsEnabled) this.clampToArena();
-    }
-    this.instances.sync();
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.physics.pause(paused);
   }
 
-  /**
-   * Backstop: keep every body inside the arena when walls are on. Wall collisions
-   * already handle the normal case; this only catches the rare escapee (a fast
-   * detonate tunnelling/clearing a wall, or pile pressure squeezing one through),
-   * so nothing ever leaks out — without affecting resting objects.
-   */
-  private clampToArena(): void {
-    const lim = BOARD.half - BOARD.wallInset - 0.05;
-    const ceil = BOARD.wallHeight + 4;
-    for (const e of this.entities) {
-      const p = e.body.position;
-      const v = e.body.velocity;
-      if (p.x > lim) { p.x = lim; if (v.x > 0) v.x = 0; }
-      else if (p.x < -lim) { p.x = -lim; if (v.x < 0) v.x = 0; }
-      if (p.z > lim) { p.z = lim; if (v.z > 0) v.z = 0; }
-      else if (p.z < -lim) { p.z = -lim; if (v.z < 0) v.z = 0; }
-      if (p.y > ceil && v.y > 0) { p.y = ceil; v.y = 0; }
-    }
+  setGravity(value: number): void {
+    this.physics.gravity(value);
+  }
+
+  setRestitution(value: number): void {
+    this.physics.restitution(value);
+  }
+
+  setWalls(on: boolean): void {
+    if (on === this.wallsEnabled) return;
+    this.wallsEnabled = on;
+    this.physics.walls(on);
+    this.render.wallGroup.visible = on;
+  }
+
+  detonate(center: Vec3, strength: number, spin: number): void {
+    this.physics.detonate(center, strength, spin);
+  }
+
+  implode(center: Vec3, strength: number): void {
+    this.physics.implode(center, strength);
+  }
+
+  grabStart(index: number, point: Vec3): void {
+    this.physics.grabStart(index, point);
+  }
+
+  grabMove(point: Vec3): void {
+    this.physics.grabMove(point);
+  }
+
+  grabEnd(): void {
+    this.physics.grabEnd();
   }
 }

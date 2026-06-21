@@ -1,18 +1,17 @@
 /**
  * Interaction — the heart of the feel.
- * Empty space → orbit the camera. A hit on a shape → grip via PointToPointConstraint.
- * The off-center pivot produces torque → the shape tumbles and spins when thrown.
+ * Empty space → orbit the camera. A hit on a shape → grip it (the worker owns the
+ * constraint; we just stream the drag target). Default drag moves horizontally (X/Z);
+ * hold Shift to set height. Off-center grabs tumble on throw (handled in the worker).
  */
 import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-import { FEEL, BOARD } from '../config';
+import { BOARD } from '../config';
 import type { RenderContext } from '../render/scene';
 import type { Sandbox } from '../sandbox';
 
 const TARGET = new THREE.Vector3(0, 0.5, 0);
 
 export interface Controls {
-  /** Restore the camera to its default angle/zoom. */
   resetCamera: () => void;
 }
 
@@ -25,8 +24,8 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
   // --- Orbit state (spherical coordinates around TARGET) ---
   const offset = camera.position.clone().sub(TARGET);
   const initialRadius = offset.length();
-  const initialPhi = Math.acos(offset.y / initialRadius); // angle from +Y
-  const initialTheta = Math.atan2(offset.x, offset.z); // turn around Y
+  const initialPhi = Math.acos(offset.y / initialRadius);
+  const initialTheta = Math.atan2(offset.x, offset.z);
   let radius = initialRadius;
   let phi = initialPhi;
   let theta = initialTheta;
@@ -47,14 +46,10 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
   let mode: 'idle' | 'orbit' | 'grab' = 'idle';
   let lastX = 0;
   let lastY = 0;
-  let grabbed: CANNON.Body | null = null;
-  let grabbedAllowSleep = true;
-  let jointBody: CANNON.Body | null = null;
-  let constraint: CANNON.PointToPointConstraint | null = null;
+  const dragTarget = new THREE.Vector3(); // current world point the grabbed body is pulled to
   const plane = new THREE.Plane();
   const planePoint = new THREE.Vector3();
   const tmpN = new THREE.Vector3();
-  const tmpP = new THREE.Vector3();
   const camDir = new THREE.Vector3();
 
   const setNdc = (e: PointerEvent) => {
@@ -63,100 +58,45 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
     ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
   };
 
-  const beginGrab = (body: CANNON.Body, hitPoint: THREE.Vector3) => {
-    grabbed = body;
-    grabbedAllowSleep = body.allowSleep;
-    body.allowSleep = false;
-    body.wakeUp();
-    // Calm the held object so it hangs steady instead of spinning on its own.
-    // Restored on release, so a quick flick still tumbles the throw.
-    body.angularDamping = 0.9;
-    body.linearDamping = 0.4;
-
-    // Pivot in the body's LOCAL coordinates at the hit point → off-center grip.
-    const worldHit = new CANNON.Vec3(hitPoint.x, hitPoint.y, hitPoint.z);
-    const pivotLocal = new CANNON.Vec3();
-    body.pointToLocalFrame(worldHit, pivotLocal);
-
-    // Kinematic joint body without collision.
-    jointBody = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC });
-    jointBody.collisionResponse = false;
-    jointBody.position.copy(worldHit);
-    sandbox.world.addBody(jointBody);
-
-    constraint = new CANNON.PointToPointConstraint(
-      body,
-      pivotLocal,
-      jointBody,
-      new CANNON.Vec3(0, 0, 0),
-      FEEL.gripMaxForce, // NOT mass-scaled → heavy shapes lag = feel heavy
-    );
-    sandbox.world.addConstraint(constraint);
-  };
-
-  /**
-   * Drag mapping:
-   *  - default → move horizontally (X/Z) at the current height (slide on the board).
-   *  - Shift   → move vertically (set height), keeping X/Z.
-   * This keeps the two axes independent so positioning feels deliberate.
-   */
-  const moveGrab = (shift: boolean) => {
-    if (!jointBody) return;
-    raycaster.setFromCamera(ndc, camera);
-    tmpP.set(jointBody.position.x, jointBody.position.y, jointBody.position.z);
-
-    if (shift) {
-      // Vertical plane facing the camera (horizontally) → ray height sets Y.
-      camera.getWorldDirection(camDir);
-      const len = Math.hypot(camDir.x, camDir.z) || 1;
-      plane.setFromNormalAndCoplanarPoint(tmpN.set(camDir.x / len, 0, camDir.z / len), tmpP);
-      if (raycaster.ray.intersectPlane(plane, planePoint)) {
-        jointBody.position.y = Math.max(0.2, planePoint.y);
-      }
-    } else {
-      // Horizontal plane at the current height → ray sets X/Z.
-      plane.setFromNormalAndCoplanarPoint(tmpN.set(0, 1, 0), tmpP);
-      if (raycaster.ray.intersectPlane(plane, planePoint)) {
-        jointBody.position.x = planePoint.x;
-        jointBody.position.z = planePoint.z;
-      }
-    }
-
-    // With walls on, keep the drag target inside them so a grabbed object can't be
-    // dragged out through a wall (the grip force would otherwise overpower the wall).
+  const sendTarget = () => {
     if (sandbox.wallsEnabled) {
       const lim = BOARD.half - BOARD.wallInset - 0.9;
-      jointBody.position.x = Math.max(-lim, Math.min(lim, jointBody.position.x));
-      jointBody.position.z = Math.max(-lim, Math.min(lim, jointBody.position.z));
+      dragTarget.x = Math.max(-lim, Math.min(lim, dragTarget.x));
+      dragTarget.z = Math.max(-lim, Math.min(lim, dragTarget.z));
     }
+    sandbox.grabMove([dragTarget.x, dragTarget.y, dragTarget.z]);
   };
 
-  const endGrab = () => {
-    if (constraint) sandbox.world.removeConstraint(constraint);
-    if (jointBody) sandbox.world.removeBody(jointBody);
-    if (grabbed) {
-      grabbed.allowSleep = grabbedAllowSleep;
-      grabbed.angularDamping = FEEL.angularDamping;
-      grabbed.linearDamping = FEEL.linearDamping;
+  const moveGrab = (shift: boolean) => {
+    raycaster.setFromCamera(ndc, camera);
+    if (shift) {
+      camera.getWorldDirection(camDir);
+      const len = Math.hypot(camDir.x, camDir.z) || 1;
+      plane.setFromNormalAndCoplanarPoint(tmpN.set(camDir.x / len, 0, camDir.z / len), dragTarget);
+      if (raycaster.ray.intersectPlane(plane, planePoint)) {
+        dragTarget.y = Math.max(0.2, planePoint.y);
+      }
+    } else {
+      plane.setFromNormalAndCoplanarPoint(tmpN.set(0, 1, 0), dragTarget);
+      if (raycaster.ray.intersectPlane(plane, planePoint)) {
+        dragTarget.x = planePoint.x;
+        dragTarget.z = planePoint.z;
+      }
     }
-    // The body keeps its velocity → throw. Off-center pivot → tumble.
-    constraint = null;
-    jointBody = null;
-    grabbed = null;
+    sendTarget();
   };
 
   // --- Events ---
   dom.addEventListener('pointerdown', (e) => {
     setNdc(e);
     raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObjects(sandbox.pickables, false);
-    const hit = hits[0];
-    const body =
-      hit && hit.instanceId != null ? sandbox.bodyAt(hit.object, hit.instanceId) : undefined;
+    const hit = raycaster.intersectObjects(sandbox.pickables, false)[0];
+    const index = hit && hit.instanceId != null ? sandbox.indexAt(hit.object, hit.instanceId) : undefined;
 
-    if (hit && body) {
+    if (hit && index != null) {
       mode = 'grab';
-      beginGrab(body, hit.point);
+      dragTarget.copy(hit.point);
+      sandbox.grabStart(index, [hit.point.x, hit.point.y, hit.point.z]);
     } else {
       mode = 'orbit';
       lastX = e.clientX;
@@ -179,7 +119,7 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
   });
 
   const release = (e: PointerEvent) => {
-    if (mode === 'grab') endGrab();
+    if (mode === 'grab') sandbox.grabEnd();
     mode = 'idle';
     if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId);
   };
@@ -190,8 +130,6 @@ export function installControls(sandbox: Sandbox, render: RenderContext): Contro
     'wheel',
     (e) => {
       e.preventDefault();
-      // Exponential zoom with a clamped delta: responsive for trackpad pinch (many
-      // small deltas) without being wild for a mouse wheel (few large deltas).
       const dy = Math.max(-25, Math.min(25, e.deltaY));
       radius *= Math.exp(dy * 0.01);
       updateCamera();

@@ -21,14 +21,10 @@ if (import.meta.env.DEV) {
   (window as unknown as { __phys?: unknown }).__phys = { sandbox, render, THREE };
 }
 
-let last = performance.now();
-function loop(now: number): void {
-  const dt = (now - last) / 1000;
-  last = now;
-
-  sandbox.update(dt);
+// The worker steps physics off-thread and streams transforms (applied into the
+// instance matrices as they arrive); the render loop just draws the latest state.
+function loop(): void {
   render.renderer.render(render.scene, render.camera);
-
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
