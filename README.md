@@ -24,13 +24,20 @@ pnpm preview  # serve the production build
 
 ## Controls
 
-- **Drag a shape** — grip it via a constraint and move it. Off-center grabs apply
-  torque, so shapes tumble and spin when thrown. Release keeps the velocity → throw.
+- **Drag a shape** — grip it and slide it horizontally (X/Z). Hold **Shift** while
+  dragging to set its height instead. Off-center grabs apply torque, so a quick flick
+  tumbles the throw; held still, a shape settles quickly rather than spinning forever.
 - **Drag empty space** — orbit the camera. **Scroll** — zoom.
 - **Spawn buttons** — one per shape (ball, cube, plate, domino, cylinder, prism, torus).
+  **Press and hold** any spawn button to keep spawning.
 - **+10 / +25 mixed** — fill the board with random shapes.
-- **Chain** — spawn an interlocking torus chain.
-- **Gravity / Bounce** sliders, **Detonate / Implode**, **Pause / Clear / Reset**.
+- **Chain** — spawn an interlocking torus chain (held together purely by the threaded
+  colliders, no constraints).
+- **Detonate / Implode** — **hold to charge**: a tap is a light pop, a full hold is a
+  huge blast.
+- **Walls** — toggle invisible boundary walls so nothing skids off the board.
+- **Gravity / Bounce** sliders. **Pause**. **Clear** empties the board; **Reset**
+  restores the default gravity/bounce/camera and the starter scene.
 
 ## Architecture
 

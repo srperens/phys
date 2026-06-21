@@ -47,6 +47,27 @@ export function createGround(world: CANNON.World): CANNON.Body {
   return ground;
 }
 
+/**
+ * Four invisible, inward-facing wall planes around the board so shapes can't
+ * skid or bounce off the edge. Returned but NOT added to the world — the sandbox
+ * toggles them on/off. `boundary` is just inside the visible board (half-size 12).
+ */
+export function createWalls(boundary = 11.5): CANNON.Body[] {
+  const localNormal = new CANNON.Vec3(0, 0, 1); // CANNON.Plane faces +Z
+  const specs: Array<{ pos: CANNON.Vec3; normal: CANNON.Vec3 }> = [
+    { pos: new CANNON.Vec3(boundary, 0, 0), normal: new CANNON.Vec3(-1, 0, 0) },
+    { pos: new CANNON.Vec3(-boundary, 0, 0), normal: new CANNON.Vec3(1, 0, 0) },
+    { pos: new CANNON.Vec3(0, 0, boundary), normal: new CANNON.Vec3(0, 0, -1) },
+    { pos: new CANNON.Vec3(0, 0, -boundary), normal: new CANNON.Vec3(0, 0, 1) },
+  ];
+  return specs.map(({ pos, normal }) => {
+    const body = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane() });
+    body.position.copy(pos);
+    body.quaternion.setFromVectors(localNormal, normal);
+    return body;
+  });
+}
+
 /** Fixed timestep with delta clamp → physics stays stable regardless of FPS. */
 export function stepWorld(world: CANNON.World, dt: number): void {
   const clamped = Math.min(dt, SIM.maxDelta);

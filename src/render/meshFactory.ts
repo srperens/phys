@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import type { ObjectDef } from '../objects/defs';
-import { prismPositions } from '../objects/prism';
+import { prismPositions, prismUVs } from '../objects/prism';
 import { checkerTexture } from './textures';
 
 export function createMesh(def: ObjectDef): THREE.Mesh {
@@ -38,6 +38,7 @@ function makeGeometry(def: ObjectDef): THREE.BufferGeometry {
     case 'prism': {
       const geom = new THREE.BufferGeometry();
       geom.setAttribute('position', new THREE.BufferAttribute(prismPositions(), 3));
+      geom.setAttribute('uv', new THREE.BufferAttribute(prismUVs(), 2));
       geom.computeVertexNormals();
       return geom;
     }

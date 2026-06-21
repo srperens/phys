@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { createWorld, installContactMaterial, createGround, stepWorld } from './physics/world';
+import { createWorld, installContactMaterial, createGround, createWalls, stepWorld } from './physics/world';
 import { createBody } from './physics/bodyFactory';
 import { createMesh } from './render/meshFactory';
 import { OBJECT_DEFS, OBJECT_LIST, type ObjectDef } from './objects/defs';
@@ -21,7 +21,9 @@ export class Sandbox {
   private readonly render: RenderContext;
   private readonly entities: Entity[] = [];
   private readonly constraints: CANNON.Constraint[] = [];
+  private readonly walls: CANNON.Body[] = createWalls();
   paused = false;
+  wallsEnabled = false;
 
   /** Deterministic pseudo-random → nicely spread spawns, reproducible. */
   private seed = 1;
@@ -98,29 +100,35 @@ export class Sandbox {
   }
 
   /**
-   * Torus chain (M5): N tori threaded through each other, linked with DistanceConstraints.
-   * Every other link is rotated 90° so the holes alternate → they interlock like real links.
+   * Torus chain (M5): N tori genuinely threaded through each other — NO constraints.
+   * Every other link is rotated 90° so the holes alternate; each link captures its
+   * neighbor's near arc inside its hole. The links hold together purely because the
+   * sphere-ring collider stops the tube from passing back through the ring, exactly
+   * like real chain links. Spacing ≈ ring radius so neighbors stay interlocked.
    */
   spawnChain(links = 7): void {
     const def = OBJECT_DEFS.torus;
     if (def.shape.kind !== 'torus') return;
-    const spacing = def.shape.radius; // < diameter → neighbors overlap into each other's holes
+    const spacing = def.shape.radius;
     const startX = -(links - 1) * spacing * 0.5;
-    let prev: CANNON.Body | undefined;
 
     for (let i = 0; i < links; i++) {
       const entity = this.spawn('torus', new CANNON.Vec3(startX + i * spacing, 7, 0));
       if (!entity) continue;
-      // Alternate hole axis (Z / Y) so the links interlock.
+      // Alternate hole axis (Z / Y) so consecutive links interlock.
       entity.body.quaternion.setFromEuler(i % 2 === 0 ? 0 : Math.PI / 2, 0, 0);
-
-      if (prev) {
-        const c = new CANNON.DistanceConstraint(prev, entity.body, spacing, 1e6);
-        this.world.addConstraint(c);
-        this.constraints.push(c);
-      }
-      prev = entity.body;
     }
+  }
+
+  /** Toggle the invisible boundary walls. */
+  setWalls(on: boolean): void {
+    if (on === this.wallsEnabled) return;
+    this.wallsEnabled = on;
+    for (const w of this.walls) {
+      if (on) this.world.addBody(w);
+      else this.world.removeBody(w);
+    }
+    this.wakeAll();
   }
 
   /** Wake all sleeping bodies — e.g. when gravity/bounce changes or on detonate. */

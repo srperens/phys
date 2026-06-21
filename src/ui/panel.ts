@@ -37,6 +37,8 @@ const CSS = `
 .phys-panel button:hover { background: rgba(255,255,255,0.12); }
 .phys-panel button:active { background: rgba(255,255,255,0.18); }
 .phys-panel button.accent { border-color: rgba(224,122,95,0.5); color: #f0b6a6; }
+.phys-panel button.full { grid-column: 1 / -1; }
+.phys-panel button.on { border-color: rgba(79,182,168,0.6); color: #9fe0d4; background: rgba(79,182,168,0.12); }
 .phys-charge { position: relative; overflow: hidden; }
 .phys-charge .phys-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
   pointer-events: none; transition: width 0.04s linear; }
@@ -118,6 +120,18 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
     ),
   );
   body.appendChild(forceRow);
+
+  // Invisible boundary walls toggle.
+  const wallRow = el('div', 'phys-row');
+  const wallsBtn = button('Walls: off', () => {
+    const on = !sandbox.wallsEnabled;
+    sandbox.setWalls(on);
+    wallsBtn.textContent = on ? 'Walls: on' : 'Walls: off';
+    wallsBtn.classList.toggle('on', on);
+  });
+  wallsBtn.classList.add('full');
+  wallRow.appendChild(wallsBtn);
+  body.appendChild(wallRow);
 
   // Sim controls.
   const actionRow = el('div', 'phys-row-3');

@@ -55,3 +55,38 @@ export function prismPositions(): Float32Array {
   }
   return new Float32Array(out);
 }
+
+type V3 = [number, number, number];
+const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: V3, b: V3): V3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+const norm = (a: V3): V3 => {
+  const l = Math.hypot(a[0], a[1], a[2]) || 1;
+  return [a[0] / l, a[1] / l, a[2] / l];
+};
+
+/**
+ * Per-triangle planar UVs (aligned to prismPositions), so the checker texture
+ * shows on the prism. Each face is projected onto its own plane; scale 1 matches
+ * the ~4-squares-per-unit density of the box/sphere geometries.
+ */
+export function prismUVs(): Float32Array {
+  const out: number[] = [];
+  for (const tri of PRISM_TRIS) {
+    const p0 = PRISM_VERTS[tri[0]];
+    const n = norm(cross(sub(PRISM_VERTS[tri[1]], p0), sub(PRISM_VERTS[tri[2]], p0)));
+    // A tangent basis on the face plane.
+    const seed: V3 = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const t = norm(sub(seed, [n[0] * dot(seed, n), n[1] * dot(seed, n), n[2] * dot(seed, n)]));
+    const b = cross(n, t);
+    for (const idx of tri) {
+      const v = PRISM_VERTS[idx];
+      out.push(dot(v, t), dot(v, b));
+    }
+  }
+  return new Float32Array(out);
+}
