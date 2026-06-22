@@ -2,7 +2,7 @@
  * Render layer. Only mirrors the physics. Dark, clean scene with soft shadows.
  */
 import * as THREE from 'three';
-import { PALETTE, BOARD } from '../config';
+import { PALETTE, BOARD, GROUND_TONES } from '../config';
 
 export interface RenderContext {
   renderer: THREE.WebGLRenderer;
@@ -54,10 +54,12 @@ function setupLights(scene: THREE.Scene): void {
   const key = new THREE.DirectionalLight(0xfff2e0, 1.35);
   key.position.set(6, 12, 8);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  // Cover well beyond the board so shapes flung onto the surrounding ground still cast
+  // shadows; a bigger map keeps the larger frustum from looking soft.
+  key.shadow.mapSize.set(2048, 2048);
   key.shadow.camera.near = 1;
-  key.shadow.camera.far = 40;
-  const d = 14;
+  key.shadow.camera.far = 60;
+  const d = 26;
   key.shadow.camera.left = -d;
   key.shadow.camera.right = d;
   key.shadow.camera.top = d;
@@ -73,15 +75,36 @@ function setupLights(scene: THREE.Scene): void {
 function setupBoard(scene: THREE.Scene): void {
   const size = BOARD.size;
 
-  // Outer ground extending well beyond the board, so the world doesn't float in
-  // the void and the translucent walls have something to read against.
-  const outer = new THREE.Mesh(
-    new THREE.PlaneGeometry(size * 5, size * 5),
-    new THREE.MeshStandardMaterial({ color: 0x10141a, roughness: 1, metalness: 0 }),
-  );
-  outer.rotation.x = -Math.PI / 2;
-  outer.position.y = -0.04;
-  scene.add(outer);
+  // Outer ground: a patchwork of board-sized tiles in different muted tones, tiled
+  // around the arena so the world reads as many boards rather than one sterile floor.
+  // The central tile is left out — the brighter arena board sits there.
+  const tiles = 5; // 5×5 grid of board-sized tiles → outer ground is 5× the board
+  const outerSize = size * tiles;
+  const half = (tiles - 1) / 2;
+  for (let i = 0; i < tiles; i++) {
+    for (let j = 0; j < tiles; j++) {
+      if (i === half && j === half) continue; // arena tile — covered by the board
+      // Deterministic, neighbour-varying tone pick so adjacent tiles differ.
+      const tone = GROUND_TONES[(i * 3 + j * 5 + i * j) % GROUND_TONES.length];
+      const tile = new THREE.Mesh(
+        new THREE.PlaneGeometry(size, size),
+        new THREE.MeshStandardMaterial({ color: tone, roughness: 1, metalness: 0 }),
+      );
+      tile.rotation.x = -Math.PI / 2;
+      tile.position.set((i - half) * size, -0.04, (j - half) * size);
+      tile.receiveShadow = true;
+      scene.add(tile);
+    }
+  }
+
+  // Grid over the whole outer ground, same 1-unit cells as the board so the squares
+  // line up. Sits just below the board top, so the opaque board occludes it within
+  // the arena (no doubled lines) and it only shows on the surrounding ground.
+  const outerGrid = new THREE.GridHelper(outerSize, outerSize, PALETTE.grid, PALETTE.grid);
+  (outerGrid.material as THREE.Material).opacity = 0.16;
+  (outerGrid.material as THREE.Material).transparent = true;
+  outerGrid.position.y = -0.005;
+  scene.add(outerGrid);
 
   const board = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),
@@ -95,7 +118,7 @@ function setupBoard(scene: THREE.Scene): void {
   board.receiveShadow = true;
   scene.add(board);
 
-  // Subtle grid as a motion reference.
+  // Subtle grid as a motion reference — the brighter arena grid on top of the board.
   const grid = new THREE.GridHelper(size, size, PALETTE.grid, PALETTE.grid);
   (grid.material as THREE.Material).opacity = 0.35;
   (grid.material as THREE.Material).transparent = true;

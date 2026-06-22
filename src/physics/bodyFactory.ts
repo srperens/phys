@@ -4,7 +4,6 @@
 import * as CANNON from 'cannon-es';
 import type { ObjectDef } from '../objects/defs';
 import { PRISM_VERTS, PRISM_FACES } from '../objects/prism';
-import { DODECA_VERTS, DODECA_FACES } from '../objects/dodeca';
 import { GOMBOC } from '../objects/gomboc';
 import { FEEL } from '../config';
 
@@ -51,13 +50,6 @@ function makeShape(def: ObjectDef): CANNON.Shape {
         vertices: PRISM_VERTS.map(([x, y, z]) => new CANNON.Vec3(x, y, z)),
         faces: PRISM_FACES,
       });
-    case 'dodeca': {
-      const r = def.shape.radius;
-      return new CANNON.ConvexPolyhedron({
-        vertices: DODECA_VERTS.map(([x, y, z]) => new CANNON.Vec3(x * r, y * r, z * r)),
-        faces: DODECA_FACES,
-      });
-    }
     case 'torus':
     case 'gomboc':
       // Handled directly in createBody (offset/compound shapes). Never reached.

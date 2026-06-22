@@ -26,8 +26,17 @@ export const FEEL = {
   gripMaxForce: 500,
 
   /** Solver iterations. More iterations resolve deep-pile overlaps cleanly so the
-   *  pile doesn't boil; the chain stays together via link constraints (spawnChain). */
+   *  pile doesn't boil; the chain stays together via link constraints (spawnChain).
+   *  This is the MAX, used for normal scenes — see the adaptive knobs below. */
   solverIterations: 30,
+
+  /** Adaptive solver: each iteration costs CPU per contact, so a huge pile (e.g. the
+   *  286-cube Pyramid XXXL) at full iterations can run the physics slow-mo. We keep full
+   *  iterations up to `solverFullUpTo` bodies, then ramp down to `solverIterationsMin` by
+   *  `solverMinAt` bodies — so small scenes stay rigid and big collapses stay smooth. */
+  solverIterationsMin: 8,
+  solverFullUpTo: 80,
+  solverMinAt: 300,
 
   /** Contact stiffness/relaxation — moderate stiffness with softer relaxation so
    *  overlap correction is gentle (doesn't inject jitter velocity) and stable. */
@@ -69,6 +78,8 @@ export const SIM = {
 export const PALETTE = {
   background: 0x171b21,
   board: 0x424b56,
+  /** Ground beyond the board — same blue-grey tone, a few shades darker so the board still reads. */
+  boardOuter: 0x2b323b,
   grid: 0x5b6671,
   warmWhite: 0xf2ece1,
   teal: 0x4fb6a8,
@@ -77,3 +88,15 @@ export const PALETTE = {
   amber: 0xd9a14a,
   slate: 0x7a8794,
 } as const;
+
+/** Patchwork of board-sized tiles surrounding the arena — muted, low-saturation tones
+ *  in the same dark family so the world reads as many boards, not one sterile floor.
+ *  All darker than PALETTE.board, so the central arena stays the brightest. */
+export const GROUND_TONES = [
+  0x2b323b, // blue-grey
+  0x313a36, // green-grey
+  0x3b3640, // violet-grey
+  0x3c372e, // warm umber
+  0x2f3a40, // steel-blue
+  0x383039, // mauve-grey
+] as const;

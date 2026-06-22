@@ -3,7 +3,6 @@
  * transform frames to a callback. All physics lives in the worker; this is just the
  * messaging surface.
  */
-import { DODECA_VERTS, DODECA_FACES } from '../objects/dodeca';
 import type { MainToWorker, WorkerToMain } from './protocol';
 
 export type FrameHandler = (gen: number, count: number, transforms: Float32Array) => void;
@@ -16,18 +15,26 @@ export class PhysicsClient {
     this.worker.onmessage = (e: MessageEvent<WorkerToMain>) => {
       if (e.data.type === 'frame') onFrame(e.data.gen, e.data.count, new Float32Array(e.data.buffer));
     };
-    // dodeca hull is computed on the main thread (three) and handed to the worker.
-    this.post({ type: 'init', dodecaVerts: DODECA_VERTS, dodecaFaces: DODECA_FACES });
+    this.post({ type: 'init' });
   }
 
   private post(m: MainToWorker): void {
     this.worker.postMessage(m);
   }
 
-  spawn(gen: number, id: string, pos: [number, number, number], quat: [number, number, number, number]): void {
-    this.post({ type: 'spawn', gen, id, pos, quat });
+  spawn(
+    gen: number,
+    id: string,
+    pos: [number, number, number],
+    quat: [number, number, number, number],
+    vel?: [number, number, number],
+  ): void {
+    this.post({ type: 'spawn', gen, id, pos, quat, vel });
   }
   spawnChain(gen: number): void { this.post({ type: 'spawnChain', gen }); }
+  structure(gen: number, name: string, offset: [number, number, number]): void {
+    this.post({ type: 'structure', gen, name, offset });
+  }
   clear(gen: number): void { this.post({ type: 'clear', gen }); }
   pause(paused: boolean): void { this.post({ type: 'pause', paused }); }
   gravity(value: number): void { this.post({ type: 'gravity', value }); }
@@ -38,6 +45,10 @@ export class PhysicsClient {
   }
   implode(center: [number, number, number], strength: number): void {
     this.post({ type: 'implode', center, strength });
+  }
+  stopMotion(): void { this.post({ type: 'stopMotion' }); }
+  strike(index: number, impulse: [number, number, number], point: [number, number, number]): void {
+    this.post({ type: 'strike', index, impulse, point });
   }
   grabStart(index: number, point: [number, number, number]): void {
     this.post({ type: 'grabStart', index, point });

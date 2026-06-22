@@ -11,7 +11,6 @@ export type ShapeDef =
   | { kind: 'cylinder'; radius: number; height: number; segments: number }
   | { kind: 'prism' } // triangular prism, geometry in prism.ts
   | { kind: 'torus'; radius: number; tube: number; segments: number } // collider = ring of spheres
-  | { kind: 'dodeca'; radius: number } // collider = convex hull, see dodeca.ts
   | { kind: 'gomboc' }; // self-righting teardrop, see gomboc.ts
 
 export interface ObjectDef {
@@ -41,16 +40,17 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
   plate: {
     id: 'plate',
     label: 'Plate',
-    shape: { kind: 'box', halfExtents: [0.7, 0.12, 0.7] },
+    shape: { kind: 'box', halfExtents: [0.7, 0.2, 0.7] },
     mass: 2.5,
     color: PALETTE.warmWhite,
   },
-  domino: {
-    id: 'domino',
-    label: 'Domino',
-    shape: { kind: 'box', halfExtents: [0.28, 0.62, 0.12] },
-    mass: 2,
-    color: PALETTE.indigo,
+  block: {
+    id: 'block',
+    label: 'Block',
+    // Elongated plank (3 across = a square footprint) — the Jenga building block.
+    shape: { kind: 'box', halfExtents: [0.6, 0.13, 0.2] },
+    mass: 1.5,
+    color: PALETTE.amber,
   },
   cylinder: {
     id: 'cylinder',
@@ -75,13 +75,6 @@ export const OBJECT_DEFS: Record<string, ObjectDef> = {
     shape: { kind: 'torus', radius: 0.85, tube: 0.24, segments: 18 },
     mass: 5,
     color: PALETTE.warmWhite,
-  },
-  dodeca: {
-    id: 'dodeca',
-    label: 'Dodeka',
-    shape: { kind: 'dodeca', radius: 0.8 },
-    mass: 6,
-    color: PALETTE.indigo,
   },
   gomboc: {
     id: 'gomboc',

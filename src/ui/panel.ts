@@ -2,6 +2,7 @@
  * Control panel — glassy, matte, no gradients/glow. Collapsible on mobile.
  */
 import { OBJECT_LIST } from '../objects/defs';
+import { STRUCTURE_LIST } from '../objects/structures';
 import { FEEL } from '../config';
 import type { Sandbox } from '../sandbox';
 import type { Controls } from '../interaction/controls';
@@ -12,8 +13,8 @@ const BLAST_CENTER: [number, number, number] = [0, 0.5, 0];
 const CSS = `
 .phys-panel {
   position: fixed; top: 16px; left: 16px; z-index: 10;
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 14px; width: 230px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 13px; width: 230px;
   font: 13px/1.4 system-ui, sans-serif; color: #e7ecf1;
   background: rgba(20, 24, 29, 0.55);
   backdrop-filter: blur(14px) saturate(120%);
@@ -29,13 +30,13 @@ const CSS = `
   text-transform: uppercase; color: #9aa7b3; margin: 0;
   display: flex; justify-content: space-between; align-items: center; }
 .phys-chevron { display: none; transition: transform 0.15s ease; color: #9aa7b3; }
-.phys-body { display: flex; flex-direction: column; gap: 12px; }
+.phys-body { display: flex; flex-direction: column; gap: 8px; }
 .phys-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .phys-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .phys-panel button {
   appearance: none; border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.05); color: #e7ecf1;
-  padding: 8px 6px; border-radius: 9px; cursor: pointer;
+  padding: 6px 5px; border-radius: 8px; cursor: pointer;
   font: inherit; transition: background 0.12s ease;
 }
 .phys-panel button:hover { background: rgba(255,255,255,0.12); }
@@ -48,6 +49,13 @@ const CSS = `
   pointer-events: none; transition: width 0.04s linear; }
 .phys-charge .phys-label { position: relative; z-index: 1; }
 .phys-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 2px 0; }
+.phys-group-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #9aa7b3; margin-bottom: -4px; }
+.phys-keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px;
+  color: #9aa7b3; font-size: 11px; align-items: center; }
+.phys-keys kbd { justify-self: start; font: 10px/1.5 ui-monospace, SFMono-Regular, monospace;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 4px; padding: 1px 6px; color: #e7ecf1; white-space: nowrap; }
 .phys-stat { display: flex; justify-content: space-between; color: #9aa7b3; }
 .phys-stat b { color: #e7ecf1; font-weight: 600; }
 .phys-field label { display: block; color: #9aa7b3; margin-bottom: 4px; }
@@ -99,12 +107,24 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   }
   body.appendChild(spawnRow);
 
-  // Bulk spawn + chain. Also hold-to-repeat.
-  const bulkRow = el('div', 'phys-row-3');
+  // Bulk spawn. Also hold-to-repeat.
+  const bulkRow = el('div', 'phys-row');
   bulkRow.appendChild(repeatButton('+10 mixed', () => sandbox.spawnMany(10)));
   bulkRow.appendChild(repeatButton('+25 mixed', () => sandbox.spawnMany(25)));
-  bulkRow.appendChild(repeatButton('Chain', () => sandbox.spawnChain()));
   body.appendChild(bulkRow);
+
+  body.appendChild(divider());
+
+  // Prebuilt structures — ready-made stacks to drop in and knock down.
+  const structLabel = el('div', 'phys-group-label');
+  structLabel.textContent = 'Structures';
+  body.appendChild(structLabel);
+  const structRow = el('div', 'phys-row');
+  for (const s of STRUCTURE_LIST) {
+    structRow.appendChild(button(s.label, () => sandbox.spawnStructure(s.id)));
+  }
+  structRow.appendChild(button('Chain', () => sandbox.spawnChain()));
+  body.appendChild(structRow);
 
   body.appendChild(divider());
 
@@ -122,50 +142,74 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
 
   body.appendChild(divider());
 
-  // Forces — hold to charge up the blast, release to fire.
+  // Forces — hold to charge up the blast, release to fire. Space and Shift+Space drive
+  // these same buttons (and their fill bars) from the keyboard.
   const forceRow = el('div', 'phys-row');
-  forceRow.appendChild(
-    chargeButton('Detonate', 'rgba(224,122,95,0.45)', (r) =>
-      sandbox.detonate(BLAST_CENTER, 50 + r * 320, 20 + r * 40),
-    ),
+  const detonateBtn = chargeButton('Detonate', 'rgba(224,122,95,0.45)', (r) =>
+    sandbox.detonate(BLAST_CENTER, 50 + r * 320, 20 + r * 40),
   );
-  forceRow.appendChild(
-    chargeButton('Implode', 'rgba(79,182,168,0.45)', (r) =>
-      sandbox.implode(BLAST_CENTER, 50 + r * 300),
-    ),
+  const implodeBtn = chargeButton('Implode', 'rgba(79,182,168,0.45)', (r) =>
+    sandbox.implode(BLAST_CENTER, 50 + r * 300),
   );
+  forceRow.appendChild(detonateBtn.el);
+  forceRow.appendChild(implodeBtn.el);
   body.appendChild(forceRow);
 
-  // Invisible boundary walls toggle.
-  const wallRow = el('div', 'phys-row');
+  // Walls toggle + free-fly toggle share a row (Fly is also WASD / Esc in controls).
+  const toggleRow = el('div', 'phys-row');
   const wallsBtn = button('Walls: off', () => {
     const on = !sandbox.wallsEnabled;
     sandbox.setWalls(on);
     wallsBtn.textContent = on ? 'Walls: on' : 'Walls: off';
     wallsBtn.classList.toggle('on', on);
   });
-  wallsBtn.classList.add('full');
-  wallRow.appendChild(wallsBtn);
-  body.appendChild(wallRow);
-
-  // Sim controls.
-  const actionRow = el('div', 'phys-row-3');
-  const pauseBtn = button('Pause', () => {
-    sandbox.setPaused(!sandbox.paused);
-    pauseBtn.textContent = sandbox.paused ? 'Play' : 'Pause';
+  const flyBtn = button('Fly: off', () => {
+    controls.setFly(!controls.isFlying());
   });
-  actionRow.appendChild(pauseBtn);
+  toggleRow.appendChild(wallsBtn);
+  toggleRow.appendChild(flyBtn);
+  body.appendChild(toggleRow);
+
+  // Motion control: Freeze (pause stepping, keep velocities — a cue/sling during the
+  // freeze loads motion that fires on resume) and the related Halt (kill linear motion,
+  // keep spin) share a row.
+  const motionRow = el('div', 'phys-row');
+  const pauseBtn = button('Freeze', () => sandbox.setPaused(!sandbox.paused));
+  const haltBtn = button('Halt (H)', () => sandbox.stopMotion());
+  motionRow.appendChild(pauseBtn);
+  motionRow.appendChild(haltBtn);
+  body.appendChild(motionRow);
+
+  // Clear + Reset.
+  const actionRow = el('div', 'phys-row');
   actionRow.appendChild(button('Clear', () => sandbox.clear()));
-  actionRow.appendChild(
-    button('Reset', () => {
-      // Back to the initial state: empty board, default feel, default camera, starter scene.
-      sandbox.clear();
-      setSlider(gravity.input, FEEL.gravity);
-      setSlider(bounce.input, FEEL.restitution);
-      controls.resetCamera();
-      sandbox.spawnStarterScene();
-    }),
-  );
+  // Back to the initial state: empty board, default feel, default camera, starter scene.
+  const doReset = () => {
+    sandbox.clear();
+    setSlider(gravity.input, FEEL.gravity);
+    setSlider(bounce.input, FEEL.restitution);
+    controls.resetCamera();
+    sandbox.spawnStarterScene();
+  };
+  actionRow.appendChild(button('Reset', doReset));
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'r' && !e.repeat) {
+      doReset();
+      return;
+    }
+    // Number keys spawn: 1–8 a shape (hold to spam), Shift+1–6 a structure.
+    const digit = /^Digit([1-9])$/.exec(e.code);
+    if (!digit) return;
+    const idx = Number(digit[1]) - 1;
+    if (e.shiftKey) {
+      if (e.repeat) return; // one structure per press
+      const s = STRUCTURE_LIST[idx];
+      if (s) sandbox.spawnStructure(s.id);
+    } else {
+      const d = OBJECT_LIST[idx];
+      if (d) sandbox.spawn(d.id);
+    }
+  });
   body.appendChild(actionRow);
 
   // Counters.
@@ -179,6 +223,54 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   const fpsValue = fpsStat.querySelector('b')!;
   body.appendChild(fpsStat);
 
+  // Keyboard legend.
+  body.appendChild(divider());
+  const keysLabel = el('div', 'phys-group-label');
+  keysLabel.textContent = 'Shortcuts';
+  body.appendChild(keysLabel);
+  const keys = el('div', 'phys-keys');
+  const SHORTCUTS: Array<[string, string]> = [
+    ['C', 'Cue — hold + drag back'],
+    ['V', 'Slingshot — hold + drag'],
+    ['Space', 'Detonate — hold to charge'],
+    ['⇧ Space', 'Implode — hold to charge'],
+    ['F', 'Freeze / resume'],
+    ['H', 'Halt (keep spin)'],
+    ['R', 'Reset'],
+    ['1–8', 'Spawn a shape (hold to spam)'],
+    ['⇧ 1–6', 'Spawn a structure'],
+    ['WASD', 'Fly around'],
+    ['Q / E', 'Fly down / up'],
+    ['Shift', 'Sprint (fly)'],
+    ['Esc', 'Exit fly'],
+  ];
+  for (const [key, desc] of SHORTCUTS) {
+    const kbd = document.createElement('kbd');
+    kbd.textContent = key;
+    const d = el('span');
+    d.textContent = desc;
+    keys.append(kbd, d);
+  }
+  body.appendChild(keys);
+
+  // Space charges Detonate, Shift+Space charges Implode — driving the actual buttons so
+  // their fill bars animate. Which one is decided at press and held until release.
+  let charged: ChargeButton | null = null;
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space') return;
+    e.preventDefault(); // no page scroll, no activating a focused button
+    if (charged) return; // ignore key-repeat
+    charged = e.shiftKey ? implodeBtn : detonateBtn;
+    charged.press();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code !== 'Space') return;
+    e.preventDefault();
+    if (!charged) return;
+    charged.release();
+    charged = null;
+  });
+
   document.body.appendChild(panel);
 
   // Keep counters updated; FPS averaged over a short window so it doesn't flicker.
@@ -186,6 +278,11 @@ export function createPanel(sandbox: Sandbox, controls: Controls): void {
   let frames = 0;
   const tick = () => {
     statValue.textContent = String(sandbox.count);
+    const flying = controls.isFlying();
+    flyBtn.classList.toggle('on', flying);
+    flyBtn.textContent = flying ? 'Fly: on' : 'Fly: off';
+    pauseBtn.classList.toggle('on', sandbox.paused);
+    pauseBtn.textContent = sandbox.paused ? 'Resume' : 'Freeze';
     frames++;
     const now = performance.now();
     const elapsed = now - windowStart;
@@ -244,16 +341,25 @@ function divider(): HTMLElement {
   return el('div', 'phys-divider');
 }
 
+interface ChargeButton {
+  el: HTMLButtonElement;
+  /** Begin charging (drives the same fill animation as a pointer press). */
+  press: () => void;
+  /** Release → fire with the charged ratio. */
+  release: () => void;
+}
+
 /**
  * Charge button: hold to fill up power (0→1 over CHARGE_MS), release to fire.
  * `fire` receives the charge ratio; a quick tap fires near 0, a full hold near 1.
+ * Exposes press/release so a keyboard shortcut can drive the very same button + bar.
  */
 function chargeButton(
   label: string,
   fillColor: string,
   fire: (ratio: number) => void,
   chargeMs = 1400,
-): HTMLButtonElement {
+): ChargeButton {
   const b = document.createElement('button');
   b.className = 'phys-charge';
 
@@ -277,14 +383,13 @@ function chargeButton(
     raf = requestAnimationFrame(tick);
   };
 
-  b.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
+  const press = () => {
+    if (charging) return;
     charging = true;
     start = performance.now();
     fill.style.width = '0%';
-    b.setPointerCapture(e.pointerId);
     tick();
-  });
+  };
 
   const release = () => {
     if (!charging) return;
@@ -293,9 +398,15 @@ function chargeButton(
     fire(ratioNow());
     fill.style.width = '0%';
   };
+
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    b.setPointerCapture(e.pointerId);
+    press();
+  });
   b.addEventListener('pointerup', release);
   b.addEventListener('pointercancel', release);
-  return b;
+  return { el: b, press, release };
 }
 
 interface Slider {
